@@ -1,0 +1,3953 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <title></title>
+    <style>
+        .input_title {
+            border: none;
+            font-size: 24px;
+            font-family: 微软雅黑;
+            text-align: center;
+        }
+
+        .input_item_title {
+            border: 1px solid black;
+            font-size: 14px;
+            font-family: 微软雅黑;
+            font-weight: bold;
+            text-align: center;
+            padding: 5px;
+        }
+
+        .input_cell_right {
+            border: 1px solid black;
+            font-size: 14px;
+            font-family: 微软雅黑;
+            text-align: right;
+            padding: 5px;
+        }
+
+        .input_cell_center {
+            border: 1px solid black;
+            font-size: 14px;
+            font-family: 微软雅黑;
+            text-align: center;
+            padding: 5px;
+        }
+
+        .input_cell_left {
+            border: 1px solid black;
+            font-size: 14px;
+            font-family: 微软雅黑;
+            text-align: left;
+            padding: 5px;
+        }
+
+        .input_box {
+            font-size: 14px;
+            font-family: 微软雅黑;
+            text-align: right;
+            width: 100%;
+            border: none;
+        }
+
+        .input_box_fill {
+            font-size: 14px;
+            font-family: 微软雅黑;
+            text-align: right;
+            width: 100%;
+            border: none;
+        }
+
+        .black_border {
+            border: 1px solid black;
+            text-align: center;
+        }
+
+        .btn {
+            font-size: 14px;
+            font-family: 微软雅黑;
+        }
+
+        .color_title {
+            background-color: #ccffbb;
+        }
+
+        .color_proj {
+            background-color: #ffe699;
+        }
+
+        .color_calc_title {
+            background-color: #444444;
+            color: white;
+        }
+
+        .color_weather {
+            background-color: #cceebb;
+        }
+
+        .color_line {
+            background-color: #bbddee;
+        }
+
+        .color_islt {
+            background-color: #ffccff;
+        }
+
+        .color_concentrate {
+            background-color: #ffbbbb;
+        }
+
+        .out_put_div {
+            margin: 30px;
+        }
+    </style>
+    <script type="text/javascript">
+        //导线拉力计算程序 JavaScript版
+        //编写：中国核电工程有限公司河北分公司电力所谭李师
+        //日期：2018/9/11
+
+        //完全参照《一次手册》拉力计算章节手算算例
+        //《手册》算例中各种细节错误，无所适从，无从参考，恼火，头大
+
+
+        //本程序规定：
+        //计算状态排序（同时也是各数组排序）：
+
+        //1) 最高温度q1
+        //2) 有冰有风q7
+        //3) 最大风速q6
+        //4) 最低温度q1
+        //5) 停电检修/带电检修/施工安装q6'
+
+        //后续所有代码序号、元素编号、计算等，均按此顺序
+        //要注意，js代码中，第一个元素的编号为0
+        //所以为了程序执行方便，以上数据变量编码序号为：
+
+        //1) 最高温度q1     →q0
+        //2) 有冰有风q7     →q1
+        //3) 最大风速q6     →q2
+        //4) 最低温度q1（q0）
+        //5) 停电检修/带电检修/施工安装q6'  →q3
+
+        //def Arrays
+        //*******************************************************************************************
+        //导线、绝缘子等数据，均来自《手册》相关数据表，人工录入Excel
+        //本段代码由数据表Excel VBA自动生成
+        var data_line_index = new Array(13);    //导线数据表标题
+        var data_line = new Array(60);          //导线数据表
+        for (var i = 0; i < 60; i++) {
+            data_line[i] = new Array(13);       //每个导线的数据
+        }
+        var data_islt_index = new Array(12);    //绝缘子数据表标题
+        var data_islt = new Array(23);          //绝缘子数据表
+        for (var i = 0; i < 23; i++) {
+            data_islt[i] = new Array(12);       //每个绝缘子的数据
+        }
+        var data_islt_wind_index = new Array(5);//绝缘子风荷载
+        var data_islt_wind = new Array(6);
+        for (var i = 0; i < 6; i++) {
+            data_islt_wind[i] = new Array(5);
+        }
+        var data_islt_ice_index = new Array(4); //绝缘子覆冰
+        var data_islt_ice = new Array(6);
+        for (var i = 0; i < 6; i++) {
+            data_islt_ice[i] = new Array(4);
+        }
+        var weather_index = new Array(15);      //气候条件
+        var weather = new Array(9);
+        for (var i = 0; i < 9; i++) {
+            weather[i] = new Array(15);
+        }
+
+        var t_connector_index = new Array(6);   //T型线夹。数据来自《电力金具》样本，永固集团
+        var t_connector = new Array(38);
+        for (var i = 0; i < 38; i++) {
+            t_connector[i] = new Array(6);
+        }
+        //************************************************************************
+
+        const data_from_table = 0;  //标记：采用数据表数据
+        const data_from_calc = 1;   //标记：采用计算得到的数据代替查表数据
+        var fix = 3;                //计算过程中，显示在页面上的小数位数
+        var concentrate_count = 0;  //当前集中荷载的数量
+
+
+
+        //************************************************************************
+        //************************************************************************
+        //通用代码
+
+        //设置字体颜色，如果是来自数据表显示为蓝色，如果是计算所得显示为绿色
+        function set_color(id, from_table_or_from_calc) {
+            if (from_table_or_from_calc == data_from_table) {
+                $(id).css("color", "blue");
+            } else if (from_table_or_from_calc == data_from_calc) {
+                $(id).css("color", "green");
+            }
+        }
+
+        //检测输入数据是否为数字，返回值：Boolean
+        function IsNumeric(v) {
+            var reg = /^((\-|\+)?(\d)*?)(\.\d+)?$/;
+            //var reg = /^(\-|\+)?+(\.\d+)?$/;
+            if (!reg.test(v)) {
+                alert("输入不是数字，请核实修改\n" + v);
+                return false;
+            }
+            else { return true; }
+        }
+
+        //检测输入数据是否为正数，返回值：Boolean
+        function IsPositiveNumeric(v) {
+            var reg = /^((\+)?(\d)*?)(\.\d+)?$/;
+            //var reg = /^[0-9]+.?[0-9]*$/;
+            if (!reg.test(v)) {
+                alert("输入不是正数，请核实修改\n" + v);
+                return false;
+            }
+            else { return true; }
+        }
+
+        //************************************************************************
+        //************************************************************************
+
+
+
+        //************************************************************************
+        //************************************************************************
+        //初始化数据表
+        //导线、绝缘子等数据，均来自《手册》相关数据表，人工录入Excel
+        //本段代码由数据表Excel VBA自动生成
+        function init_arrrays() {
+            data_line_index[0] = "导线型号";
+            data_line_index[1] = "计算直径";
+            data_line_index[2] = "计算截面";
+            data_line_index[3] = "膨胀系数";
+            data_line_index[4] = "弹性模量";
+            data_line_index[5] = "0/0";
+            data_line_index[6] = "10/0";
+            data_line_index[7] = "25/0";
+            data_line_index[8] = "30/0";
+            data_line_index[9] = "35/0";
+            data_line_index[10] = "10/5";
+            data_line_index[11] = "10/10";
+            data_line_index[12] = "15/15";
+            data_line[0][0] = "LJ-50";
+            data_line[0][1] = 9;
+            data_line[0][2] = 49.48;
+            data_line[0][3] = .000023;
+            data_line[0][4] = 59000;
+            data_line[0][5] = .1355;
+            data_line[0][6] = .1966;
+            data_line[0][7] = .443;
+            data_line[0][8] = .6224;
+            data_line[0][9] = .8379;
+            data_line[0][10] = .3627;
+            data_line[0][11] = .709;
+            data_line[0][12] = 1.3287;
+            data_line[1][0] = "LJ-70";
+            data_line[1][1] = 10.8;
+            data_line[1][2] = 71.25;
+            data_line[1][3] = .000023;
+            data_line[1][4] = 59000;
+            data_line[1][5] = .1951;
+            data_line[1][6] = .2112;
+            data_line[1][7] = .5425;
+            data_line[1][8] = .7546;
+            data_line[1][9] = 1.0112;
+            data_line[1][10] = .446;
+            data_line[1][11] = .817;
+            data_line[1][12] = 1.4625;
+            data_line[2][0] = "LJ-95";
+            data_line[2][1] = 12.48;
+            data_line[2][2] = 95.14;
+            data_line[2][3] = .000023;
+            data_line[2][4] = 59000;
+            data_line[2][5] = .2605;
+            data_line[2][6] = .2768;
+            data_line[2][7] = .6404;
+            data_line[2][8] = .8817;
+            data_line[2][9] = 1.1758;
+            data_line[2][10] = .535;
+            data_line[2][11] = .929;
+            data_line[2][12] = 1.597;
+            data_line[3][0] = "LJ-120";
+            data_line[3][1] = 14.25;
+            data_line[3][2] = 121.21;
+            data_line[3][3] = .000023;
+            data_line[3][4] = 56000;
+            data_line[3][5] = .3335;
+            data_line[3][6] = .3502;
+            data_line[3][7] = .7465;
+            data_line[3][8] = 1.018;
+            data_line[3][9] = 1.351;
+            data_line[3][10] = .6325;
+            data_line[3][11] = 1.0518;
+            data_line[3][12] = 1.743;
+            data_line[4][0] = "LJ-150";
+            data_line[4][1] = 15.75;
+            data_line[4][2] = 148.07;
+            data_line[4][3] = .000023;
+            data_line[4][4] = 56000;
+            data_line[4][5] = .4074;
+            data_line[4][6] = .424;
+            data_line[4][7] = .843;
+            data_line[4][8] = 1.1384;
+            data_line[4][9] = 1.503;
+            data_line[4][10] = .727;
+            data_line[4][11] = 1.167;
+            data_line[4][12] = 1.8789;
+            data_line[5][0] = "LJ-185";
+            data_line[5][1] = 17.5;
+            data_line[5][2] = 182.8;
+            data_line[5][3] = .000023;
+            data_line[5][4] = 56000;
+            data_line[5][5] = .503;
+            data_line[5][6] = .512;
+            data_line[5][7] = .9622;
+            data_line[5][8] = 1.2836;
+            data_line[5][9] = 1.6846;
+            data_line[5][10] = .8468;
+            data_line[5][11] = 1.3115;
+            data_line[5][12] = 2.046;
+            data_line[6][0] = "LJ-210";
+            data_line[6][1] = 18.75;
+            data_line[6][2] = 209.85;
+            data_line[6][3] = .000023;
+            data_line[6][4] = 56000;
+            data_line[6][5] = .5774;
+            data_line[6][6] = .5942;
+            data_line[6][7] = 1.0515;
+            data_line[6][8] = 1.391;
+            data_line[6][9] = 1.8168;
+            data_line[6][10] = .9385;
+            data_line[6][11] = 1.421;
+            data_line[6][12] = 2.123;
+            data_line[7][0] = "LJ-240";
+            data_line[7][1] = 20;
+            data_line[7][2] = 238.76;
+            data_line[7][3] = .000023;
+            data_line[7][4] = 56000;
+            data_line[7][5] = .6569;
+            data_line[7][6] = .6738;
+            data_line[7][7] = 1.1447;
+            data_line[7][8] = 1.503;
+            data_line[7][9] = 1.951;
+            data_line[7][10] = 1.035;
+            data_line[7][11] = 1.535;
+            data_line[7][12] = 2.3027;
+            data_line[8][0] = "LJ-300";
+            data_line[8][1] = 22.4;
+            data_line[8][2] = 297.57;
+            data_line[8][3] = .000023;
+            data_line[8][4] = 56000;
+            data_line[8][5] = .8204;
+            data_line[8][6] = .8374;
+            data_line[8][7] = 1.3325;
+            data_line[8][8] = 1.72;
+            data_line[8][9] = 2.215;
+            data_line[8][10] = 1.2322;
+            data_line[8][11] = 1.766;
+            data_line[8][12] = 2.565;
+            data_line[9][0] = "LJ-400";
+            data_line[9][1] = 25.9;
+            data_line[9][2] = 397.83;
+            data_line[9][3] = .000023;
+            data_line[9][4] = 56000;
+            data_line[9][5] = 1.097;
+            data_line[9][6] = 1.114;
+            data_line[9][7] = 1.636;
+            data_line[9][8] = 2.064;
+            data_line[9][9] = 2.62;
+            data_line[9][10] = 1.5576;
+            data_line[9][11] = 2.14;
+            data_line[9][12] = 2.986;
+            data_line[10][0] = "LJ-500";
+            data_line[10][1] = 29.12;
+            data_line[10][2] = 502.9;
+            data_line[10][3] = .000023;
+            data_line[10][4] = 56000;
+            data_line[10][5] = 1.387;
+            data_line[10][6] = 1.404;
+            data_line[10][7] = 1.946;
+            data_line[10][8] = 2.405;
+            data_line[10][9] = 3.013;
+            data_line[10][10] = 1.8911;
+            data_line[10][11] = 2.521;
+            data_line[10][12] = 3.409;
+            data_line[11][0] = "LJ-630";
+            data_line[11][1] = 32.67;
+            data_line[11][2] = 631.3;
+            data_line[11][3] = .000023;
+            data_line[11][4] = 54000;
+            data_line[11][5] = 1.744;
+            data_line[11][6] = 1.761;
+            data_line[11][7] = 2.32;
+            data_line[11][8] = 2.811;
+            data_line[11][9] = 3.471;
+            data_line[11][10] = 2.299;
+            data_line[11][11] = 2.878;
+            data_line[11][12] = 3.913;
+            data_line[12][0] = "LJ-800";
+            data_line[12][1] = 36.9;
+            data_line[12][2] = 805.36;
+            data_line[12][3] = .000023;
+            data_line[12][4] = 54000;
+            data_line[12][5] = 2.225;
+            data_line[12][6] = 2.242;
+            data_line[12][7] = 2.818;
+            data_line[12][8] = 3.339;
+            data_line[12][9] = 4.055;
+            data_line[12][10] = 2.84;
+            data_line[12][11] = 3.578;
+            data_line[12][12] = 4.569;
+            data_line[13][0] = "LGJ-50/8";
+            data_line[13][1] = 9.6;
+            data_line[13][2] = 56.29;
+            data_line[13][3] = .0000191;
+            data_line[13][4] = 79000;
+            data_line[13][5] = .1951;
+            data_line[13][6] = .2079;
+            data_line[13][7] = .4905;
+            data_line[13][8] = .6767;
+            data_line[13][9] = .9033;
+            data_line[13][10] = .4277;
+            data_line[13][11] = .7819;
+            data_line[13][12] = 1.4076;
+            data_line[14][0] = "LGJ-50/30";
+            data_line[14][1] = 11.6;
+            data_line[14][2] = 80.32;
+            data_line[14][3] = .0000153;
+            data_line[14][4] = 105000;
+            data_line[14][5] = .372;
+            data_line[14][6] = .38;
+            data_line[14][7] = .659;
+            data_line[14][8] = .8668;
+            data_line[14][9] = 1.129;
+            data_line[14][10] = .6281;
+            data_line[14][11] = 1.0112;
+            data_line[14][12] = 1.657;
+            data_line[15][0] = "LGJ-70/10";
+            data_line[15][1] = 11.4;
+            data_line[15][2] = 79.39;
+            data_line[15][3] = .0000191;
+            data_line[15][4] = 79000;
+            data_line[15][5] = .2752;
+            data_line[15][6] = .288;
+            data_line[15][7] = .7808;
+            data_line[15][8] = .8177;
+            data_line[15][9] = 1.082;
+            data_line[15][10] = .532;
+            data_line[15][11] = .9113;
+            data_line[15][12] = 1.5611;
+            data_line[16][0] = "LGJ-70/40";
+            data_line[16][1] = 13.6;
+            data_line[16][2] = 110.4;
+            data_line[16][3] = .0000153;
+            data_line[16][4] = 105000;
+            data_line[16][5] = .5113;
+            data_line[16][6] = .5214;
+            data_line[16][7] = .8172;
+            data_line[16][8] = 1.0507;
+            data_line[16][9] = 1.3508;
+            data_line[16][10] = .7945;
+            data_line[16][11] = 1.2817;
+            data_line[16][12] = 1.8756;
+            data_line[17][0] = "LGJ-95/15";
+            data_line[17][1] = 13.61;
+            data_line[17][2] = 109.72;
+            data_line[17][3] = .0000189;
+            data_line[17][4] = 76000;
+            data_line[17][5] = .3808;
+            data_line[17][6] = .3942;
+            data_line[17][7] = .7426;
+            data_line[17][8] = .9938;
+            data_line[17][9] = 1.3067;
+            data_line[17][10] = .668;
+            data_line[17][11] = 1.0786;
+            data_line[17][12] = 1.7563;
+            data_line[18][0] = "LGJ-95/2";
+            data_line[18][1] = 13.87;
+            data_line[18][2] = 113.96;
+            data_line[18][3] = .0000185;
+            data_line[18][4] = 76000;
+            data_line[18][5] = .4089;
+            data_line[18][6] = .4219;
+            data_line[18][7] = .7679;
+            data_line[18][8] = 1.0214;
+            data_line[18][9] = 1.338;
+            data_line[18][10] = .6992;
+            data_line[18][11] = 1.1133;
+            data_line[18][12] = 1.7937;
+            data_line[19][0] = "LGJ-95/55";
+            data_line[19][1] = 16;
+            data_line[19][2] = 152.81;
+            data_line[19][3] = .0000153;
+            data_line[19][4] = 105000;
+            data_line[19][5] = .7077;
+            data_line[19][6] = .7178;
+            data_line[19][7] = 1.0312;
+            data_line[19][8] = 1.2912;
+            data_line[19][9] = 1.631;
+            data_line[19][10] = 1.0234;
+            data_line[19][11] = 1.4687;
+            data_line[19][12] = 2.1674;
+            data_line[20][0] = "LGJ-120/7";
+            data_line[20][1] = 14.5;
+            data_line[20][2] = 125.5;
+            data_line[20][3] = .0000212;
+            data_line[20][4] = 66000;
+            data_line[20][5] = .379;
+            data_line[20][6] = .3943;
+            data_line[20][7] = .7782;
+            data_line[20][8] = 1.05;
+            data_line[20][9] = 1.3848;
+            data_line[20][10] = .6804;
+            data_line[20][11] = 1.1028;
+            data_line[20][12] = 1.7956;
+            data_line[21][0] = "LGJ-120/20";
+            data_line[21][1] = 15.07;
+            data_line[21][2] = 134.49;
+            data_line[21][3] = .0000189;
+            data_line[21][4] = 76000;
+            data_line[21][5] = .4668;
+            data_line[21][6] = .4803;
+            data_line[21][7] = .8464;
+            data_line[21][8] = 1.119;
+            data_line[21][9] = 1.461;
+            data_line[21][10] = .774;
+            data_line[21][11] = 1.2048;
+            data_line[21][12] = 1.9015;
+            data_line[22][0] = "LGJ-120/25";
+            data_line[22][1] = 15.74;
+            data_line[22][2] = 146.73;
+            data_line[22][3] = .0000185;
+            data_line[22][4] = 76000;
+            data_line[22][5] = .5266;
+            data_line[22][6] = .5396;
+            data_line[22][7] = .9066;
+            data_line[22][8] = 1.1854;
+            data_line[22][9] = 1.5389;
+            data_line[22][10] = .8425;
+            data_line[22][11] = 1.2829;
+            data_line[22][12] = 1.9876;
+            data_line[23][0] = "LGJ-120/70";
+            data_line[23][1] = 18;
+            data_line[23][2] = 193.4;
+            data_line[23][3] = .0000153;
+            data_line[23][4] = 105000;
+            data_line[23][5] = .8956;
+            data_line[23][6] = .9057;
+            data_line[23][7] = 1.2306;
+            data_line[23][8] = 1.5094;
+            data_line[23][9] = 1.881;
+            data_line[23][10] = 1.2385;
+            data_line[23][11] = 1.7115;
+            data_line[23][12] = 2.4343;
+            data_line[24][0] = "LGJ-150/8";
+            data_line[24][1] = 16;
+            data_line[24][2] = 152.8;
+            data_line[24][3] = .0000212;
+            data_line[24][4] = 66000;
+            data_line[24][5] = .4614;
+            data_line[24][6] = .4767;
+            data_line[24][7] = .8805;
+            data_line[24][8] = 1.1744;
+            data_line[24][9] = 1.5407;
+            data_line[24][10] = .7831;
+            data_line[24][11] = 1.168;
+            data_line[24][12] = 1.9394;
+            data_line[25][0] = "LGJ-150/20";
+            data_line[25][1] = 16.67;
+            data_line[25][2] = 164.5;
+            data_line[25][3] = .0000196;
+            data_line[25][4] = 73000;
+            data_line[25][5] = .5494;
+            data_line[25][6] = .5634;
+            data_line[25][7] = .9549;
+            data_line[25][8] = 1.252;
+            data_line[25][9] = 1.6266;
+            data_line[25][10] = .8791;
+            data_line[25][11] = 1.3331;
+            data_line[25][12] = 2.0504;
+            data_line[26][0] = "LGJ-150/25";
+            data_line[26][1] = 17.1;
+            data_line[26][2] = 173.11;
+            data_line[26][3] = .0000189;
+            data_line[26][4] = 76000;
+            data_line[26][5] = .601;
+            data_line[26][6] = .614;
+            data_line[26][7] = 1.001;
+            data_line[26][8] = 1.301;
+            data_line[26][9] = 1.682;
+            data_line[26][10] = .936;
+            data_line[26][11] = 1.396;
+            data_line[26][12] = 2.1184;
+            data_line[27][0] = "LGJ-150/35";
+            data_line[27][1] = 17.5;
+            data_line[27][2] = 181.62;
+            data_line[27][3] = .0000178;
+            data_line[27][4] = 80000;
+            data_line[27][5] = .6762;
+            data_line[27][6] = .688;
+            data_line[27][7] = 1.062;
+            data_line[27][8] = 1.36;
+            data_line[27][9] = 1.744;
+            data_line[27][10] = 1.0156;
+            data_line[27][11] = 1.4811;
+            data_line[27][12] = 2.2061;
+            data_line[28][0] = "LGJ-185/10";
+            data_line[28][1] = 18;
+            data_line[28][2] = 193.4;
+            data_line[28][3] = .0000212;
+            data_line[28][4] = 66000;
+            data_line[28][5] = .584;
+            data_line[28][6] = .599;
+            data_line[28][7] = 1.026;
+            data_line[28][8] = 1.348;
+            data_line[28][9] = 1.754;
+            data_line[28][10] = .9329;
+            data_line[28][11] = 1.4056;
+            data_line[28][12] = 2.143;
+            data_line[29][0] = "LGJ-185/20";
+            data_line[29][1] = 18.9;
+            data_line[29][2] = 211.29;
+            data_line[29][3] = .0000196;
+            data_line[29][4] = 73000;
+            data_line[29][5] = .7061;
+            data_line[29][6] = .72;
+            data_line[29][7] = 1.132;
+            data_line[29][8] = 1.457;
+            data_line[29][9] = 1.873;
+            data_line[29][10] = 1.0664;
+            data_line[29][11] = 1.5517;
+            data_line[29][12] = 2.2983;
+            data_line[30][0] = "LGJ-185/30";
+            data_line[30][1] = 18.88;
+            data_line[30][2] = 210.93;
+            data_line[30][3] = .0000189;
+            data_line[30][4] = 76000;
+            data_line[30][5] = .7326;
+            data_line[30][6] = .746;
+            data_line[30][7] = 1.148;
+            data_line[30][8] = 1.469;
+            data_line[30][9] = 1.883;
+            data_line[30][10] = 1.0922;
+            data_line[30][11] = 1.5768;
+            data_line[30][12] = 2.3221;
+            data_line[31][0] = "LGJ-185/45";
+            data_line[31][1] = 19.6;
+            data_line[31][2] = 227.83;
+            data_line[31][3] = .0000178;
+            data_line[31][4] = 80000;
+            data_line[31][5] = .8482;
+            data_line[31][6] = .86;
+            data_line[31][7] = 1.25;
+            data_line[31][8] = 1.571;
+            data_line[31][9] = 1.989;
+            data_line[31][10] = 1.2266;
+            data_line[31][11] = 1.7119;
+            data_line[31][12] = 2.4637;
+            data_line[32][0] = "LGJ-210/10";
+            data_line[32][1] = 19;
+            data_line[32][2] = 215.48;
+            data_line[32][3] = .0000212;
+            data_line[32][4] = 66000;
+            data_line[32][5] = .6507;
+            data_line[32][6] = .666;
+            data_line[32][7] = 1.102;
+            data_line[32][8] = 1.438;
+            data_line[32][9] = 1.863;
+            data_line[32][10] = 1.0139;
+            data_line[32][11] = 1.5002;
+            data_line[32][12] = 2.2511;
+            data_line[33][0] = "LGJ-210/25";
+            data_line[33][1] = 19.98;
+            data_line[33][2] = 236.12;
+            data_line[33][3] = .0000196;
+            data_line[33][4] = 73000;
+            data_line[33][5] = .7891;
+            data_line[33][6] = .803;
+            data_line[33][7] = 1.224;
+            data_line[33][8] = 1.567;
+            data_line[33][9] = 1.998;
+            data_line[33][10] = 1.1645;
+            data_line[33][11] = 1.6643;
+            data_line[33][12] = 2.4255;
+            data_line[34][0] = "LGJ-210/35";
+            data_line[34][1] = 20.38;
+            data_line[34][2] = 246.09;
+            data_line[34][3] = .0000189;
+            data_line[34][4] = 76000;
+            data_line[34][5] = .8539;
+            data_line[34][6] = .868;
+            data_line[34][7] = 1.281;
+            data_line[34][8] = 1.619;
+            data_line[34][9] = 20.58;
+            data_line[34][10] = 1.2341;
+            data_line[34][11] = 1.7402;
+            data_line[34][12] = 2.5045;
+            data_line[35][0] = "LGJ-210/50";
+            data_line[35][1] = 20.86;
+            data_line[35][2] = 258.06;
+            data_line[35][3] = .0000178;
+            data_line[35][4] = 80000;
+            data_line[35][5] = .9608;
+            data_line[35][6] = .973;
+            data_line[35][7] = 1.27;
+            data_line[35][8] = 1.704;
+            data_line[35][9] = 2.143;
+            data_line[35][10] = 1.3467;
+            data_line[35][11] = 1.8592;
+            data_line[35][12] = 2.6269;
+            data_line[36][0] = "LGJ-240/30";
+            data_line[36][1] = 21.6;
+            data_line[36][2] = 275.96;
+            data_line[36][3] = .0000196;
+            data_line[36][4] = 73000;
+            data_line[36][5] = .9222;
+            data_line[36][6] = .936;
+            data_line[36][7] = 1.369;
+            data_line[36][8] = 1.725;
+            data_line[36][9] = 2.188;
+            data_line[36][10] = 1.32;
+            data_line[36][11] = 1.8428;
+            data_line[36][12] = 2.624;
+            data_line[37][0] = "LGJ-240/40";
+            data_line[37][1] = 21.66;
+            data_line[37][2] = 277.75;
+            data_line[37][3] = .0000189;
+            data_line[37][4] = 76000;
+            data_line[37][5] = .9643;
+            data_line[37][6] = .9779;
+            data_line[37][7] = 1.11;
+            data_line[37][8] = 1.751;
+            data_line[37][9] = 2.211;
+            data_line[37][10] = 1.3621;
+            data_line[37][11] = 1.8863;
+            data_line[37][12] = 2.6479;
+            data_line[38][0] = "LGJ-240/55";
+            data_line[38][1] = 22.4;
+            data_line[38][2] = 297.57;
+            data_line[38][3] = .0000178;
+            data_line[38][4] = 80000;
+            data_line[38][5] = 1.108;
+            data_line[38][6] = 1.12;
+            data_line[38][7] = 1.526;
+            data_line[38][8] = 1.874;
+            data_line[38][9] = 2.357;
+            data_line[38][10] = 1.5153;
+            data_line[38][11] = 2.0498;
+            data_line[38][12] = 2.8368;
+            data_line[39][0] = "LGJ-300/15";
+            data_line[39][1] = 23.01;
+            data_line[39][2] = 312.21;
+            data_line[39][3] = .0000214;
+            data_line[39][4] = 61000;
+            data_line[39][5] = .9398;
+            data_line[39][6] = .9555;
+            data_line[39][7] = 1.4306;
+            data_line[39][8] = 1.8154;
+            data_line[39][9] = 2.313;
+            data_line[39][10] = 1.3588;
+            data_line[39][11] = 1.9015;
+            data_line[39][12] = 2.7054;
+            data_line[40][0] = "LGJ-300/20";
+            data_line[40][1] = 23.43;
+            data_line[40][2] = 324.33;
+            data_line[40][3] = .0000209;
+            data_line[40][4] = 63000;
+            data_line[40][5] = 1.002;
+            data_line[40][6] = 1.0173;
+            data_line[40][7] = 1.4867;
+            data_line[40][8] = 1.8722;
+            data_line[40][9] = 2.3744;
+            data_line[40][10] = 1.4064;
+            data_line[40][11] = 1.9751;
+            data_line[40][12] = 2.7833;
+            data_line[41][0] = "LGJ-300/25";
+            data_line[41][1] = 23.76;
+            data_line[41][2] = 333.31;
+            data_line[41][3] = .0000205;
+            data_line[41][4] = 65000;
+            data_line[41][5] = 1.058;
+            data_line[41][6] = 1.0729;
+            data_line[41][7] = 1.5361;
+            data_line[41][8] = 1.9213;
+            data_line[41][9] = 2.4258;
+            data_line[41][10] = 1.4867;
+            data_line[41][11] = 2.04;
+            data_line[41][12] = 2.8512;
+            data_line[42][0] = "LGJ-300/40";
+            data_line[42][1] = 23.94;
+            data_line[42][2] = 338.99;
+            data_line[42][3] = .0000196;
+            data_line[42][4] = 73000;
+            data_line[42][5] = 1.133;
+            data_line[42][6] = 1.1471;
+            data_line[42][7] = 1.5945;
+            data_line[42][8] = 1.9736;
+            data_line[42][9] = 2.4742;
+            data_line[42][10] = 1.5633;
+            data_line[42][11] = 2.119;
+            data_line[42][12] = 2.9309;
+            data_line[43][0] = "LGJ-300/50";
+            data_line[43][1] = 24.26;
+            data_line[43][2] = 348.36;
+            data_line[43][3] = .0000189;
+            data_line[43][4] = 76000;
+            data_line[43][5] = 1.21;
+            data_line[43][6] = 1.2236;
+            data_line[43][7] = 1.6005;
+            data_line[43][8] = 2.036;
+            data_line[43][9] = 2.5362;
+            data_line[43][10] = 1.644;
+            data_line[43][11] = 2.2;
+            data_line[43][12] = 3.0188;
+            data_line[44][0] = "LGJ-300/70";
+            data_line[44][1] = 25.2;
+            data_line[44][2] = 376.61;
+            data_line[44][3] = .0000178;
+            data_line[44][4] = 80000;
+            data_line[44][5] = 1.402;
+            data_line[44][6] = 1.4147;
+            data_line[44][7] = 1.8332;
+            data_line[44][8] = 2.2043;
+            data_line[44][9] = 2.7064;
+            data_line[44][10] = 1.8482;
+            data_line[44][11] = 2.422;
+            data_line[44][12] = 3.255;
+            data_line[45][0] = "LGJ-400/20";
+            data_line[45][1] = 26.91;
+            data_line[45][2] = 427.31;
+            data_line[45][3] = .0000214;
+            data_line[45][4] = 61000;
+            data_line[45][5] = 1.286;
+            data_line[45][6] = 1.3017;
+            data_line[45][7] = 1.8013;
+            data_line[45][8] = 2.2255;
+            data_line[45][9] = 2.7868;
+            data_line[45][10] = 1.7594;
+            data_line[45][11] = 2.3569;
+            data_line[45][12] = 3.212;
+            data_line[46][0] = "LGJ-400/25";
+            data_line[46][1] = 26.64;
+            data_line[46][2] = 419.01;
+            data_line[46][3] = .0000209;
+            data_line[46][4] = 63000;
+            data_line[46][5] = 1.295;
+            data_line[46][6] = 1.3103;
+            data_line[46][7] = 1.7989;
+            data_line[46][8] = 2.216;
+            data_line[46][9] = 2.769;
+            data_line[46][10] = 1.7642;
+            data_line[46][11] = 2.358;
+            data_line[46][12] = 3.208;
+            data_line[47][0] = "LGJ-400/35";
+            data_line[47][1] = 26.82;
+            data_line[47][2] = 425.24;
+            data_line[47][3] = .0000205;
+            data_line[47][4] = 65000;
+            data_line[47][5] = 1.349;
+            data_line[47][6] = 1.364;
+            data_line[47][7] = 1.844;
+            data_line[47][8] = 2.2574;
+            data_line[47][9] = 2.8091;
+            data_line[47][10] = 1.8203;
+            data_line[47][11] = 2.4166;
+            data_line[47][12] = 3.268;
+            data_line[48][0] = "LGJ-400/50";
+            data_line[48][1] = 27.63;
+            data_line[48][2] = 451.55;
+            data_line[48][3] = .0000193;
+            data_line[48][4] = 69000;
+            data_line[48][5] = 1.511;
+            data_line[48][6] = 1.5251;
+            data_line[48][7] = 1.99;
+            data_line[48][8] = 2.4;
+            data_line[48][9] = 2.954;
+            data_line[48][10] = 1.9928;
+            data_line[48][11] = 2.6;
+            data_line[48][12] = 3.46;
+            data_line[49][0] = "LGJ-400/65";
+            data_line[49][1] = 28;
+            data_line[49][2] = 464;
+            data_line[49][3] = .0000189;
+            data_line[49][4] = 76000;
+            data_line[49][5] = 1.611;
+            data_line[49][6] = 1.6246;
+            data_line[49][7] = 2.078;
+            data_line[49][8] = 2.483;
+            data_line[49][9] = 3.0353;
+            data_line[49][10] = 2.097;
+            data_line[49][11] = 2.7104;
+            data_line[49][12] = 3.573;
+            data_line[50][0] = "LGJ-400/95";
+            data_line[50][1] = 29.14;
+            data_line[50][2] = 501.02;
+            data_line[50][3] = .000018;
+            data_line[50][4] = 78000;
+            data_line[50][5] = 1.86;
+            data_line[50][6] = 1.8728;
+            data_line[50][7] = 2.3077;
+            data_line[50][8] = 2.7071;
+            data_line[50][9] = 3.2599;
+            data_line[50][10] = 2.3614;
+            data_line[50][11] = 2.9905;
+            data_line[50][12] = 3.8648;
+            data_line[51][0] = "LGJ-500/35";
+            data_line[51][1] = 30;
+            data_line[51][2] = 531.37;
+            data_line[51][3] = .0000209;
+            data_line[51][4] = 63000;
+            data_line[51][5] = 1.642;
+            data_line[51][6] = 1.6573;
+            data_line[51][7] = 2.1618;
+            data_line[51][8] = 2.661;
+            data_line[51][9] = 3.208;
+            data_line[51][10] = 2.158;
+            data_line[51][11] = 2.799;
+            data_line[51][12] = 3.6935;
+            data_line[52][0] = "LGJ-500/45";
+            data_line[52][1] = 30;
+            data_line[52][2] = 531.68;
+            data_line[52][3] = .0000205;
+            data_line[52][4] = 65000;
+            data_line[52][5] = 1.688;
+            data_line[52][6] = 1.7029;
+            data_line[52][7] = 2.197;
+            data_line[52][8] = 2.6363;
+            data_line[52][9] = 3.232;
+            data_line[52][10] = 2.2037;
+            data_line[52][11] = 2.845;
+            data_line[52][12] = 3.7377;
+            data_line[53][0] = "LGJ-500/65";
+            data_line[53][1] = 30.96;
+            data_line[53][2] = 566.94;
+            data_line[53][3] = .0000193;
+            data_line[53][4] = 69000;
+            data_line[53][5] = 1.897;
+            data_line[53][6] = 1.9113;
+            data_line[53][7] = 2.388;
+            data_line[53][8] = 2.8224;
+            data_line[53][9] = 3.419;
+            data_line[53][10] = 2.425;
+            data_line[53][11] = 3.08;
+            data_line[53][12] = 3.983;
+            data_line[54][0] = "LGJ-630/45";
+            data_line[54][1] = 33.6;
+            data_line[54][2] = 666.55;
+            data_line[54][3] = .0000209;
+            data_line[54][4] = 63000;
+            data_line[54][5] = 2.06;
+            data_line[54][6] = 2.075;
+            data_line[54][7] = 2.593;
+            data_line[54][8] = 2.9189;
+            data_line[54][9] = 3.7112;
+            data_line[54][10] = 2.6266;
+            data_line[54][11] = 3.3183;
+            data_line[54][12] = 4.2604;
+            data_line[55][0] = "LGJ-630/55";
+            data_line[55][1] = 34.32;
+            data_line[55][2] = 696.22;
+            data_line[55][3] = .0000205;
+            data_line[55][4] = 65000;
+            data_line[55][5] = 2.209;
+            data_line[55][6] = 2.224;
+            data_line[55][7] = 2.7327;
+            data_line[55][8] = 3.201;
+            data_line[55][9] = 3.8498;
+            data_line[55][10] = 2.7853;
+            data_line[55][11] = 3.487;
+            data_line[55][12] = 4.437;
+            data_line[56][0] = "LGJ-630/80";
+            data_line[56][1] = 34.82;
+            data_line[56][2] = 715.51;
+            data_line[56][3] = .0000194;
+            data_line[56][4] = 67000;
+            data_line[56][5] = 2.388;
+            data_line[56][6] = 2.402;
+            data_line[56][7] = 2.892;
+            data_line[56][8] = 3.3504;
+            data_line[56][9] = 3.992;
+            data_line[56][10] = 2.9705;
+            data_line[56][11] = 3.6512;
+            data_line[56][12] = 4.6337;
+            data_line[57][0] = "LGJ-800/55";
+            data_line[57][1] = 38.4;
+            data_line[57][2] = 870.6;
+            data_line[57][3] = .0000209;
+            data_line[57][4] = 63000;
+            data_line[57][5] = 2.69;
+            data_line[57][6] = 2.7054;
+            data_line[57][7] = 3.2367;
+            data_line[57][8] = 3.7356;
+            data_line[57][9] = 4.4365;
+            data_line[57][10] = 3.324;
+            data_line[57][11] = 4.083;
+            data_line[57][12] = 5.089;
+            data_line[58][0] = "LGJ-800/70";
+            data_line[58][1] = 38.58;
+            data_line[58][2] = 879.4;
+            data_line[58][3] = .0000205;
+            data_line[58][4] = 65000;
+            data_line[58][5] = 2.791;
+            data_line[58][6] = 2.806;
+            data_line[58][7] = 3.3256;
+            data_line[58][8] = 3.8172;
+            data_line[58][9] = 4.5114;
+            data_line[58][10] = 3.427;
+            data_line[58][11] = 4.189;
+            data_line[58][12] = 5.196;
+            data_line[59][0] = "LGJ-800/100";
+            data_line[59][1] = 38.98;
+            data_line[59][2] = 896.05;
+            data_line[59][3] = .0000194;
+            data_line[59][4] = 67000;
+            data_line[59][5] = 2.991;
+            data_line[59][6] = 3.005;
+            data_line[59][7] = 3.505;
+            data_line[59][8] = 3.9835;
+            data_line[59][9] = 4.666;
+            data_line[59][10] = 3.632;
+            data_line[59][11] = 4.3993;
+            data_line[59][12] = 5.409;
+            data_islt_index[0] = "绝缘子型号";
+            data_islt_index[1] = "串数";
+            data_islt_index[2] = "片数";
+            data_islt_index[3] = "长度";
+            data_islt_index[4] = "0/0";
+            data_islt_index[5] = "10/0";
+            data_islt_index[6] = "25/0";
+            data_islt_index[7] = "30/0";
+            data_islt_index[8] = "35/0";
+            data_islt_index[9] = "10/5";
+            data_islt_index[10] = "10/10";
+            data_islt_index[11] = "15/15";
+            data_islt[0][0] = "X-1.5";
+            data_islt[0][1] = 1;
+            data_islt[0][2] = 1;
+            data_islt[0][3] = 146;
+            data_islt[0][4] = 5;
+            data_islt[0][5] = 5.001;
+            data_islt[0][6] = 5.0237;
+            data_islt[0][7] = 5.0493;
+            data_islt[0][8] = 5.0913;
+            data_islt[0][9] = 5.561;
+            data_islt[0][10] = 6.116;
+            data_islt[0][11] = 6.705;
+            data_islt[1][0] = "X-1.5";
+            data_islt[1][1] = 1;
+            data_islt[1][2] = 4;
+            data_islt[1][3] = 764;
+            data_islt[1][4] = 21.8;
+            data_islt[1][5] = 21.803;
+            data_islt[1][6] = 21.924;
+            data_islt[1][7] = 22.056;
+            data_islt[1][8] = 22.27;
+            data_islt[1][9] = 24.4;
+            data_islt[1][10] = 27.404;
+            data_islt[1][11] = 29.824;
+            data_islt[2][0] = "X-1.5";
+            data_islt[2][1] = 1;
+            data_islt[2][2] = 8;
+            data_islt[2][3] = 1348;
+            data_islt[2][4] = 41.8;
+            data_islt[2][5] = 41.806;
+            data_islt[2][6] = 42.019;
+            data_islt[2][7] = 42.253;
+            data_islt[2][8] = 42.635;
+            data_islt[2][9] = 43.647;
+            data_islt[2][10] = 51.868;
+            data_islt[2][11] = 56.646;
+            data_islt[3][0] = "X-1.5";
+            data_islt[3][1] = 1;
+            data_islt[3][2] = 14;
+            data_islt[3][3] = 2224;
+            data_islt[3][4] = 71.8;
+            data_islt[3][5] = 71.809;
+            data_islt[3][6] = 72.162;
+            data_islt[3][7] = 72.55;
+            data_islt[3][8] = 73.183;
+            data_islt[3][9] = 80.011;
+            data_islt[3][10] = 88.564;
+            data_islt[3][11] = 96.872;
+            data_islt[4][0] = "X-1.5";
+            data_islt[4][1] = 2;
+            data_islt[4][2] = 14;
+            data_islt[4][3] = 2419;
+            data_islt[4][4] = 152.91;
+            data_islt[4][5] = 152.93;
+            data_islt[4][6] = 153.758;
+            data_islt[4][7] = 154.663;
+            data_islt[4][8] = 156.142;
+            data_islt[4][9] = 170.056;
+            data_islt[4][10] = 189.8;
+            data_islt[4][11] = 205.224;
+            data_islt[5][0] = "XP-7";
+            data_islt[5][1] = 1;
+            data_islt[5][2] = 1;
+            data_islt[5][3] = 146;
+            data_islt[5][4] = 4;
+            data_islt[5][5] = 4.001;
+            data_islt[5][6] = 4.03;
+            data_islt[5][7] = 4.061;
+            data_islt[5][8] = 4.1135;
+            data_islt[5][9] = 4.56;
+            data_islt[5][10] = 5.191;
+            data_islt[5][11] = 5.706;
+            data_islt[6][0] = "XP-7";
+            data_islt[6][1] = 1;
+            data_islt[6][2] = 4;
+            data_islt[6][3] = 774;
+            data_islt[6][4] = 18.11;
+            data_islt[6][5] = 18.114;
+            data_islt[6][6] = 18.258;
+            data_islt[6][7] = 18.417;
+            data_islt[6][8] = 18.675;
+            data_islt[6][9] = 20.714;
+            data_islt[6][10] = 23.715;
+            data_islt[6][11] = 26.138;
+            data_islt[7][0] = "XP-7";
+            data_islt[7][1] = 1;
+            data_islt[7][2] = 8;
+            data_islt[7][3] = 1358;
+            data_islt[7][4] = 34.11;
+            data_islt[7][5] = 34.118;
+            data_islt[7][6] = 34.378;
+            data_islt[7][7] = 34.664;
+            data_islt[7][8] = 35.129;
+            data_islt[7][9] = 38.96;
+            data_islt[7][10] = 44.48;
+            data_islt[7][11] = 48.963;
+            data_islt[8][0] = "XP-7";
+            data_islt[8][1] = 1;
+            data_islt[8][2] = 14;
+            data_islt[8][3] = 2234;
+            data_islt[8][4] = 58.11;
+            data_islt[8][5] = 58.124;
+            data_islt[8][6] = 58.558;
+            data_islt[8][7] = 59.034;
+            data_islt[8][8] = 59.81;
+            data_islt[8][9] = 66.32;
+            data_islt[8][10] = 75.626;
+            data_islt[8][11] = 83.2;
+            data_islt[9][0] = "XP-10";
+            data_islt[9][1] = 1;
+            data_islt[9][2] = 1;
+            data_islt[9][3] = 155;
+            data_islt[9][4] = 5.2;
+            data_islt[9][5] = 5.201;
+            data_islt[9][6] = 5.223;
+            data_islt[9][7] = 5.247;
+            data_islt[9][8] = 5.287;
+            data_islt[9][9] = 5.761;
+            data_islt[9][10] = 6.495;
+            data_islt[9][11] = 6.905;
+            data_islt[10][0] = "XP-10";
+            data_islt[10][1] = 1;
+            data_islt[10][2] = 8;
+            data_islt[10][3] = 1455;
+            data_islt[10][4] = 44.28;
+            data_islt[10][5] = 44.287;
+            data_islt[10][6] = 44.486;
+            data_islt[10][7] = 44.708;
+            data_islt[10][8] = 45.069;
+            data_islt[10][9] = 49.127;
+            data_islt[10][10] = 55.064;
+            data_islt[10][11] = 59.124;
+            data_islt[11][0] = "XP-10";
+            data_islt[11][1] = 1;
+            data_islt[11][2] = 14;
+            data_islt[11][3] = 2385;
+            data_islt[11][4] = 75.48;
+            data_islt[11][5] = 75.49;
+            data_islt[11][6] = 75.824;
+            data_islt[11][7] = 76.19;
+            data_islt[11][8] = 76.791;
+            data_islt[11][9] = 83.693;
+            data_islt[11][10] = 94.034;
+            data_islt[11][11] = 100.553;
+            data_islt[12][0] = "XP-10";
+            data_islt[12][1] = 1;
+            data_islt[12][2] = 20;
+            data_islt[12][3] = 3315;
+            data_islt[12][4] = 106.68;
+            data_islt[12][5] = 106.699;
+            data_islt[12][6] = 107.162;
+            data_islt[12][7] = 107.672;
+            data_islt[12][8] = 108.513;
+            data_islt[12][9] = 118.259;
+            data_islt[12][10] = 133.004;
+            data_islt[12][11] = 141.983;
+            data_islt[13][0] = "XP-10";
+            data_islt[13][1] = 1;
+            data_islt[13][2] = 32;
+            data_islt[13][3] = 5175;
+            data_islt[13][4] = 169.08;
+            data_islt[13][5] = 169.111;
+            data_islt[13][6] = 169.838;
+            data_islt[13][7] = 170.636;
+            data_islt[13][8] = 171.957;
+            data_islt[13][9] = 187.391;
+            data_islt[13][10] = 210.944;
+            data_islt[13][11] = 224.843;
+            data_islt[14][0] = "XP-16";
+            data_islt[14][1] = 1;
+            data_islt[14][2] = 1;
+            data_islt[14][3] = 155;
+            data_islt[14][4] = 6;
+            data_islt[14][5] = 6.001;
+            data_islt[14][6] = 6.0198;
+            data_islt[14][7] = 6.04;
+            data_islt[14][8] = 6.076;
+            data_islt[14][9] = 6.561;
+            data_islt[14][10] = 7.191;
+            data_islt[14][11] = 7.705;
+            data_islt[15][0] = "XP-16";
+            data_islt[15][1] = 1;
+            data_islt[15][2] = 8;
+            data_islt[15][3] = 1485;
+            data_islt[15][4] = 53.52;
+            data_islt[15][5] = 53.524;
+            data_islt[15][6] = 53.69;
+            data_islt[15][7] = 53.87;
+            data_islt[15][8] = 54.175;
+            data_islt[15][9] = 58.365;
+            data_islt[15][10] = 63.886;
+            data_islt[15][11] = 68.36;
+            data_islt[16][0] = "XP-16";
+            data_islt[16][1] = 1;
+            data_islt[16][2] = 14;
+            data_islt[16][3] = 2415;
+            data_islt[16][4] = 89.52;
+            data_islt[16][5] = 89.53;
+            data_islt[16][6] = 89.809;
+            data_islt[16][7] = 90.11;
+            data_islt[16][8] = 90.63;
+            data_islt[16][9] = 97.83;
+            data_islt[16][10] = 107.03;
+            data_islt[16][11] = 114.59;
+            data_islt[17][0] = "XP-16";
+            data_islt[17][1] = 1;
+            data_islt[17][2] = 20;
+            data_islt[17][3] = 3345;
+            data_islt[17][4] = 125.52;
+            data_islt[17][5] = 125.536;
+            data_islt[17][6] = 125.928;
+            data_islt[17][7] = 126.37;
+            data_islt[17][8] = 127.086;
+            data_islt[17][9] = 137.093;
+            data_islt[17][10] = 150.179;
+            data_islt[17][11] = 160.82;
+            data_islt[18][0] = "XP-16";
+            data_islt[18][1] = 1;
+            data_islt[18][2] = 32;
+            data_islt[18][3] = 5205;
+            data_islt[18][4] = 197.52;
+            data_islt[18][5] = 197.548;
+            data_islt[18][6] = 198.166;
+            data_islt[18][7] = 198.83;
+            data_islt[18][8] = 199.998;
+            data_islt[18][9] = 215.829;
+            data_islt[18][10] = 236.471;
+            data_islt[18][11] = 253.28;
+            data_islt[19][0] = "XW-4.5";
+            data_islt[19][1] = 1;
+            data_islt[19][2] = 1;
+            data_islt[19][3] = 180;
+            data_islt[19][4] = 7;
+            data_islt[19][5] = 7.001;
+            data_islt[19][6] = 7.0188;
+            data_islt[19][7] = 7.0393;
+            data_islt[19][8] = 7.072;
+            data_islt[19][9] = 7.801;
+            data_islt[19][10] = 8.801;
+            data_islt[19][11] = 9.6135;
+            data_islt[20][0] = "XW-4.5";
+            data_islt[20][1] = 1;
+            data_islt[20][2] = 4;
+            data_islt[20][3] = 900;
+            data_islt[20][4] = 29.8;
+            data_islt[20][5] = 29.8;
+            data_islt[20][6] = 29.899;
+            data_islt[20][7] = 30.004;
+            data_islt[20][8] = 30.178;
+            data_islt[20][9] = 33.365;
+            data_islt[20][10] = 37.845;
+            data_islt[20][11] = 41.4;
+            data_islt[21][0] = "XW-4.5";
+            data_islt[21][1] = 1;
+            data_islt[21][2] = 8;
+            data_islt[21][3] = 1620;
+            data_islt[21][4] = 57.8;
+            data_islt[21][5] = 57.8;
+            data_islt[21][6] = 57.974;
+            data_islt[21][7] = 58.161;
+            data_islt[21][8] = 58.466;
+            data_islt[21][9] = 64.568;
+            data_islt[21][10] = 73.05;
+            data_islt[21][11] = 79.854;
+            data_islt[22][0] = "XW-4.5";
+            data_islt[22][1] = 1;
+            data_islt[22][2] = 14;
+            data_islt[22][3] = 2700;
+            data_islt[22][4] = 99.8;
+            data_islt[22][5] = 99.807;
+            data_islt[22][6] = 100.09;
+            data_islt[22][7] = 100.397;
+            data_islt[22][8] = 100.898;
+            data_islt[22][9] = 111.374;
+            data_islt[22][10] = 125.856;
+            data_islt[22][11] = 137.535;
+            data_islt_wind_index[0] = "绝缘子型号";
+            data_islt_wind_index[1] = 0;
+            data_islt_wind_index[2] = 5;
+            data_islt_wind_index[3] = 10;
+            data_islt_wind_index[4] = 15;
+            data_islt_wind[0][0] = "金具";
+            data_islt_wind[0][1] = .0142;
+            data_islt_wind[1][0] = "X-4.5";
+            data_islt_wind[1][1] = .019;
+            data_islt_wind[1][2] = .0222;
+            data_islt_wind[1][3] = .0256;
+            data_islt_wind[1][4] = .029;
+            data_islt_wind[2][0] = "XP-7";
+            data_islt_wind[2][1] = .019;
+            data_islt_wind[2][2] = .0222;
+            data_islt_wind[2][3] = .0256;
+            data_islt_wind[2][4] = .029;
+            data_islt_wind[3][0] = "XP-10";
+            data_islt_wind[3][1] = .019;
+            data_islt_wind[3][2] = .0222;
+            data_islt_wind[3][3] = .0256;
+            data_islt_wind[3][4] = .029;
+            data_islt_wind[4][0] = "XP-16";
+            data_islt_wind[4][1] = .019;
+            data_islt_wind[4][2] = .0222;
+            data_islt_wind[4][3] = .0256;
+            data_islt_wind[4][4] = .029;
+            data_islt_wind[5][0] = "XW-4.5";
+            data_islt_wind[5][1] = .02;
+            data_islt_wind[5][2] = .03;
+            data_islt_wind[5][3] = .034;
+            data_islt_wind[5][4] = .038;
+            data_islt_ice_index[0] = "绝缘子型号";
+            data_islt_ice_index[1] = 5;
+            data_islt_ice_index[2] = 10;
+            data_islt_ice_index[3] = 15;
+            data_islt_ice[0][0] = "金具";
+            data_islt_ice[0][1] = .36
+            data_islt_ice[0][2] = .84;
+            data_islt_ice[0][3] = 1.2;
+            data_islt_ice[1][0] = "X-4.5";
+            data_islt_ice[1][1] = .56;
+            data_islt_ice[1][2] = 1.19;
+            data_islt_ice[1][3] = 1.7;
+            data_islt_ice[2][0] = "XP-7";
+            data_islt_ice[2][1] = .56;
+            data_islt_ice[2][2] = 1.19;
+            data_islt_ice[2][3] = 1.7;
+            data_islt_ice[3][0] = "XP-10";
+            data_islt_ice[3][1] = .56;
+            data_islt_ice[3][2] = 1.19;
+            data_islt_ice[3][3] = 1.7;
+            data_islt_ice[4][0] = "XP-16";
+            data_islt_ice[4][1] = .56;
+            data_islt_ice[4][2] = 1.19;
+            data_islt_ice[4][3] = 1.7;
+            data_islt_ice[5][0] = "XW-4.5";
+            data_islt_ice[5][1] = .8;
+            data_islt_ice[5][2] = 1.8;
+            data_islt_ice[5][3] = 2.6;
+            weather_index[0] = "气象区";
+            weather_index[1] = "q0lt";
+            weather_index[2] = "q0ht";
+            weather_index[3] = "q0v";
+            weather_index[4] = "q0b";
+            weather_index[5] = "q1t";
+            weather_index[6] = "q1v";
+            weather_index[7] = "q1b";
+            weather_index[8] = "q2t";
+            weather_index[9] = "q2v";
+            weather_index[10] = "q2b";
+            weather_index[11] = "q3t";
+            weather_index[12] = "q3v";
+            weather_index[13] = "q3b";
+            weather[0][0] = "气象区1";
+            weather[0][1] = -5;
+            weather[0][2] = 40;
+            weather[0][3] = 0;
+            weather[0][4] = 0;
+            weather[0][5] = -5;
+            weather[0][6] = 10;
+            weather[0][7] = 0;
+            weather[0][8] = 10;
+            weather[0][9] = 35;
+            weather[0][10] = 0;
+            weather[0][11] = 0;
+            weather[0][12] = 10;
+            weather[0][13] = 0;
+            weather[1][0] = "气象区2";
+            weather[1][1] = -10;
+            weather[1][2] = 40;
+            weather[1][3] = 0;
+            weather[1][4] = 0;
+            weather[1][5] = -5;
+            weather[1][6] = 10;
+            weather[1][7] = 5;
+            weather[1][8] = 10;
+            weather[1][9] = 30;
+            weather[1][10] = 0;
+            weather[1][11] = 0;
+            weather[1][12] = 10;
+            weather[1][13] = 0;
+            weather[2][0] = "气象区3";
+            weather[2][1] = -10;
+            weather[2][2] = 40;
+            weather[2][3] = 0;
+            weather[2][4] = 0;
+            weather[2][5] = -5;
+            weather[2][6] = 10;
+            weather[2][7] = 5;
+            weather[2][8] = -5;
+            weather[2][9] = 25;
+            weather[2][10] = 0;
+            weather[2][11] = -5;
+            weather[2][12] = 10;
+            weather[2][13] = 0;
+            weather[3][0] = "气象区4";
+            weather[3][1] = -20;
+            weather[3][2] = 40;
+            weather[3][3] = 0;
+            weather[3][4] = 0;
+            weather[3][5] = -5;
+            weather[3][6] = 10;
+            weather[3][7] = 5;
+            weather[3][8] = -5;
+            weather[3][9] = 25;
+            weather[3][10] = 0;
+            weather[3][11] = -10;
+            weather[3][12] = 10;
+            weather[3][13] = 0;
+            weather[4][0] = "气象区5";
+            weather[4][1] = -10;
+            weather[4][2] = 40;
+            weather[4][3] = 0;
+            weather[4][4] = 0;
+            weather[4][5] = -5;
+            weather[4][6] = 10;
+            weather[4][7] = 10;
+            weather[4][8] = 10;
+            weather[4][9] = 30;
+            weather[4][10] = 0;
+            weather[4][11] = -5;
+            weather[4][12] = 10;
+            weather[4][13] = 0;
+            weather[5][0] = "气象区6";
+            weather[5][1] = -20;
+            weather[5][2] = 40;
+            weather[5][3] = 0;
+            weather[5][4] = 0;
+            weather[5][5] = -5;
+            weather[5][6] = 10;
+            weather[5][7] = 10;
+            weather[5][8] = -5;
+            weather[5][9] = 25;
+            weather[5][10] = 0;
+            weather[5][11] = -10;
+            weather[5][12] = 10;
+            weather[5][13] = 0;
+            weather[6][0] = "气象区7";
+            weather[6][1] = -40;
+            weather[6][2] = 40;
+            weather[6][3] = 0;
+            weather[6][4] = 0;
+            weather[6][5] = -5;
+            weather[6][6] = 10;
+            weather[6][7] = 10;
+            weather[6][8] = -5;
+            weather[6][9] = 30;
+            weather[6][10] = 0;
+            weather[6][11] = -15;
+            weather[6][12] = 10;
+            weather[6][13] = 0;
+            weather[7][0] = "气象区8";
+            weather[7][1] = -20;
+            weather[7][2] = 40;
+            weather[7][3] = 0;
+            weather[7][4] = 0;
+            weather[7][5] = -5;
+            weather[7][6] = 15;
+            weather[7][7] = 15;
+            weather[7][8] = -5;
+            weather[7][9] = 30;
+            weather[7][10] = 0;
+            weather[7][11] = -10;
+            weather[7][12] = 10;
+            weather[7][13] = 0;
+            weather[8][0] = "气象区9";
+            weather[8][1] = -20;
+            weather[8][2] = 40;
+            weather[8][3] = 0;
+            weather[8][4] = 0;
+            weather[8][5] = -5;
+            weather[8][6] = 15;
+            weather[8][7] = 20;
+            weather[8][8] = -5;
+            weather[8][9] = 30;
+            weather[8][10] = 0;
+            weather[8][11] = -10;
+            weather[8][12] = 10;
+            weather[8][13] = 0;
+
+            weather_index[14] = "备注";
+            weather[0][14] = "南方沿海受台风侵袭地区，如广东、广西、福建、浙江、上海等，最大风速30m/s，最低温度-5℃";
+            weather[1][14] = "华东大部分地区，最大风速25m/s，覆冰厚度为5mm，最低温度-10℃";
+            weather[2][14] = "西南地区（非重冰区），福建、广东受台风影响较弱的地区，最大风速25m/s，覆冰厚度为5mm，最低温度为-5℃";
+            weather[3][14] = "西北大部分地区及华北京津唐地区，最大风速25m/s，覆冰厚度为10mm，最低温度为-20℃";
+            weather[4][14] = "华北平原、湖北、湖南、河南，最大风速为25m/s，覆冰厚度为5mm，最低温度为-20℃";
+            weather[5][14] = "华北西北大部分地区，张家口、承德一带，最大风速25m/s，覆冰厚度为10mm，最低温度为-40℃";
+            weather[6][14] = "覆冰严重的地区，如山东、河南部分地区，湘中、鄂北、粤北地带，最大风速为25m/s，覆冰厚度为15mm，最低温度为-20℃";
+            weather[7][14] = "高覆冰大风速的极端气象条件区";
+            weather[8][14] = "高覆冰大风速的极端气象条件区";
+
+
+            t_connector_index[0] = "型号";
+            t_connector_index[1] = "适用线径-下限";
+            t_connector_index[2] = "适用线径-上限";
+            t_connector_index[3] = "适用截面";
+            t_connector_index[4] = "适用型号";
+            t_connector_index[5] = "重量";
+            t_connector[0][0] = "TL-11";
+            t_connector[0][1] = 7.5;
+            t_connector[0][2] = 9.6;
+            t_connector[0][3] = 0;
+            t_connector[0][4] = 0;
+            t_connector[0][5] = .71;
+            t_connector[1][0] = "TL-21,TL-22";
+            t_connector[1][1] = 10.8;
+            t_connector[1][2] = 14;
+            t_connector[1][3] = 0;
+            t_connector[1][4] = 0;
+            t_connector[1][5] = .79;
+            t_connector[2][0] = "TL-31~33";
+            t_connector[2][1] = 14.5;
+            t_connector[2][2] = 17.5;
+            t_connector[2][3] = 0;
+            t_connector[2][4] = 0;
+            t_connector[2][5] = 1.07;
+            t_connector[3][0] = "TL-41~43";
+            t_connector[3][1] = 18.1;
+            t_connector[3][2] = 22;
+            t_connector[3][3] = 0;
+            t_connector[3][4] = 0;
+            t_connector[3][5] = 1.17;
+            t_connector[4][0] = "TL-185/";
+            t_connector[4][1] = 0;
+            t_connector[4][2] = 0;
+            t_connector[4][3] = 185;
+            t_connector[4][4] = 0;
+            t_connector[4][5] = 2.5;
+            t_connector[5][0] = "TL-240/";
+            t_connector[5][1] = 0;
+            t_connector[5][2] = 0;
+            t_connector[5][3] = 240;
+            t_connector[5][4] = 0;
+            t_connector[5][5] = 2.5;
+            t_connector[6][0] = "TL-300/";
+            t_connector[6][1] = 0;
+            t_connector[6][2] = 0;
+            t_connector[6][3] = 300;
+            t_connector[6][4] = 0;
+            t_connector[6][5] = 3;
+            t_connector[7][0] = "TL-400/";
+            t_connector[7][1] = 0;
+            t_connector[7][2] = 0;
+            t_connector[7][3] = 400;
+            t_connector[7][4] = 0;
+            t_connector[7][5] = 3;
+            t_connector[8][0] = "TL-500/";
+            t_connector[8][1] = 0;
+            t_connector[8][2] = 0;
+            t_connector[8][3] = 500;
+            t_connector[8][4] = 0;
+            t_connector[8][5] = 3.6;
+            t_connector[9][0] = "TL-600/";
+            t_connector[9][1] = 0;
+            t_connector[9][2] = 0;
+            t_connector[9][3] = 600;
+            t_connector[9][4] = 0;
+            t_connector[9][5] = 3.6;
+            t_connector[10][0] = "TY-120/7";
+            t_connector[10][1] = 0;
+            t_connector[10][2] = 0;
+            t_connector[10][3] = 0;
+            t_connector[10][4] = "LGJ-120/7";
+            t_connector[10][5] = 1.2;
+            t_connector[11][0] = "TY-120/20";
+            t_connector[11][1] = 0;
+            t_connector[11][2] = 0;
+            t_connector[11][3] = 0;
+            t_connector[11][4] = "LGJ-120/20";
+            t_connector[11][5] = 1.2;
+            t_connector[12][0] = "TY-150/8";
+            t_connector[12][1] = 0;
+            t_connector[12][2] = 0;
+            t_connector[12][3] = 0;
+            t_connector[12][4] = "LGJ-150/8";
+            t_connector[12][5] = 1.3;
+            t_connector[13][0] = "TY-150/20";
+            t_connector[13][1] = 0;
+            t_connector[13][2] = 0;
+            t_connector[13][3] = 0;
+            t_connector[13][4] = "LGJ-150/20";
+            t_connector[13][5] = 1.3;
+            t_connector[14][0] = "TY-185/10";
+            t_connector[14][1] = 0;
+            t_connector[14][2] = 0;
+            t_connector[14][3] = 0;
+            t_connector[14][4] = "LGJ-185/10";
+            t_connector[14][5] = 1.4;
+            t_connector[15][0] = "TY-185/25";
+            t_connector[15][1] = 0;
+            t_connector[15][2] = 0;
+            t_connector[15][3] = 0;
+            t_connector[15][4] = "LGJ-185/25";
+            t_connector[15][5] = 1.4;
+            t_connector[16][0] = "TY-185/30";
+            t_connector[16][1] = 0;
+            t_connector[16][2] = 0;
+            t_connector[16][3] = 0;
+            t_connector[16][4] = "LGJ-185/30";
+            t_connector[16][5] = 1.4;
+            t_connector[17][0] = "TY-210/10";
+            t_connector[17][1] = 0;
+            t_connector[17][2] = 0;
+            t_connector[17][3] = 0;
+            t_connector[17][4] = "LGJ-210/10";
+            t_connector[17][5] = 1.5;
+            t_connector[18][0] = "TY-210/25";
+            t_connector[18][1] = 0;
+            t_connector[18][2] = 0;
+            t_connector[18][3] = 0;
+            t_connector[18][4] = "LGJ-210/25";
+            t_connector[18][5] = 1.5;
+            t_connector[19][0] = "TY-240/30";
+            t_connector[19][1] = 0;
+            t_connector[19][2] = 0;
+            t_connector[19][3] = 0;
+            t_connector[19][4] = "LGJ-240/30";
+            t_connector[19][5] = 1.6;
+            t_connector[20][0] = "TY-240/40";
+            t_connector[20][1] = 0;
+            t_connector[20][2] = 0;
+            t_connector[20][3] = 0;
+            t_connector[20][4] = "LGJ-240/40";
+            t_connector[20][5] = 1.6;
+            t_connector[21][0] = "TY-300/15";
+            t_connector[21][1] = 0;
+            t_connector[21][2] = 0;
+            t_connector[21][3] = 0;
+            t_connector[21][4] = "LGJ-300/15";
+            t_connector[21][5] = 1.7;
+            t_connector[22][0] = "TY-300/20";
+            t_connector[22][1] = 0;
+            t_connector[22][2] = 0;
+            t_connector[22][3] = 0;
+            t_connector[22][4] = "LGJ-300/20";
+            t_connector[22][5] = 1.7;
+            t_connector[23][0] = "TY-300/25";
+            t_connector[23][1] = 0;
+            t_connector[23][2] = 0;
+            t_connector[23][3] = 0;
+            t_connector[23][4] = "LGJ-300/25";
+            t_connector[23][5] = 1.7;
+            t_connector[24][0] = "TY-300/40";
+            t_connector[24][1] = 0;
+            t_connector[24][2] = 0;
+            t_connector[24][3] = 0;
+            t_connector[24][4] = "LGJ-300/40";
+            t_connector[24][5] = 1.7;
+            t_connector[25][0] = "TY-400/20";
+            t_connector[25][1] = 0;
+            t_connector[25][2] = 0;
+            t_connector[25][3] = 0;
+            t_connector[25][4] = "LGJ-400/20";
+            t_connector[25][5] = 1.9;
+            t_connector[26][0] = "TY-400/35";
+            t_connector[26][1] = 0;
+            t_connector[26][2] = 0;
+            t_connector[26][3] = 0;
+            t_connector[26][4] = "LGJ-400/35";
+            t_connector[26][5] = 1.9;
+            t_connector[27][0] = "TY-400/50";
+            t_connector[27][1] = 0;
+            t_connector[27][2] = 0;
+            t_connector[27][3] = 0;
+            t_connector[27][4] = "LGJ-400/50";
+            t_connector[27][5] = 1.9;
+            t_connector[28][0] = "TY-400/35";
+            t_connector[28][1] = 0;
+            t_connector[28][2] = 0;
+            t_connector[28][3] = 0;
+            t_connector[28][4] = "LGJ-400/35";
+            t_connector[28][5] = 1.9;
+            t_connector[29][0] = "TY-500/35";
+            t_connector[29][1] = 0;
+            t_connector[29][2] = 0;
+            t_connector[29][3] = 0;
+            t_connector[29][4] = "LGJ-500/35";
+            t_connector[29][5] = 2.3;
+            t_connector[30][0] = "TY-500/45";
+            t_connector[30][1] = 0;
+            t_connector[30][2] = 0;
+            t_connector[30][3] = 0;
+            t_connector[30][4] = "LGJ-500/45";
+            t_connector[30][5] = 2.3;
+            t_connector[31][0] = "TY-500/65";
+            t_connector[31][1] = 0;
+            t_connector[31][2] = 0;
+            t_connector[31][3] = 0;
+            t_connector[31][4] = "LGJ-500/65";
+            t_connector[31][5] = 2.3;
+            t_connector[32][0] = "TY-630/45";
+            t_connector[32][1] = 0;
+            t_connector[32][2] = 0;
+            t_connector[32][3] = 0;
+            t_connector[32][4] = "LGJ-630/45";
+            t_connector[32][5] = 4.2;
+            t_connector[33][0] = "TY-630/55";
+            t_connector[33][1] = 0;
+            t_connector[33][2] = 0;
+            t_connector[33][3] = 0;
+            t_connector[33][4] = "LGJ-630/55";
+            t_connector[33][5] = 4.2;
+            t_connector[34][0] = "TY-630/80";
+            t_connector[34][1] = 0;
+            t_connector[34][2] = 0;
+            t_connector[34][3] = 0;
+            t_connector[34][4] = "LGJ-630/80";
+            t_connector[34][5] = 4.2;
+            t_connector[35][0] = "TY-800/55";
+            t_connector[35][1] = 0;
+            t_connector[35][2] = 0;
+            t_connector[35][3] = 0;
+            t_connector[35][4] = "LGJ-800/55";
+            t_connector[35][5] = 5.5;
+            t_connector[36][0] = "TY-800/70";
+            t_connector[36][1] = 0;
+            t_connector[36][2] = 0;
+            t_connector[36][3] = 0;
+            t_connector[36][4] = "LGJ-800/70";
+            t_connector[36][5] = 5.5;
+            t_connector[37][0] = "TY-800/100";
+            t_connector[37][1] = 0;
+            t_connector[37][2] = 0;
+            t_connector[37][3] = 0;
+            t_connector[37][4] = "LGJ-800/100";
+            t_connector[37][5] = 5.5;
+        }
+        //数据表初始化完毕
+        //************************************************************************
+        //************************************************************************
+
+
+        //加载气象区数据
+        function load_weather_zones() {
+            var count = weather.length;
+            for (var i = 0; i < count; i++) {
+                $("#weather_zones").append("<option value=" + i + ">" + weather[i][0] + "</option>");
+            }
+        }
+
+        //根据用户选择，填写气象数据表
+        function fill_weather_data_to_weather_table() {
+            var index = $("#weather_zones").val();
+            for (i = 0; i < 4; i++) {
+                if (i == 0) {
+                    $("#weather_q0_t0").val(weather[index][1]); //最低温
+                    $("#weather_q0_t1").val(weather[index][2]); //最高温
+                } else {
+                    $("#weather_q" + i + "_t").val(weather[index][i * 3 + 2]);  //其他状态温度
+                }
+                $("#weather_q" + i + "_v").val(weather[index][i * 3 + 3]);      //风速
+                $("#weather_q" + i + "_b").val(weather[index][i * 3 + 4]);      //覆冰
+            }
+            $("#weather_discription").html(weather[index][14]);
+        }
+
+        //加载导线数据
+        function load_line_info(id) {
+            var count = data_line.length;
+            for (var i = 0; i < count; i++) {
+                $("#" + id).append("<option value=" + i + ">" + data_line[i][0] + "</option>");
+            }
+        }
+
+        //根据用户选择，将选定的导线数据显示在页面的表中
+        function fill_line_data_to_line_table() {
+            var index = $("#line_list").val();      //选定的序号
+            $("#line_d").val(data_line[index][1].toFixed(fix)); //线径
+            $("#line_s").val(data_line[index][2].toFixed(fix)); //截面
+            $("#line_a").val(data_line[index][3]);              //膨胀系数
+            $("#line_e").val(data_line[index][4]);              //弹性模量
+            $("#line_q0").val(data_line[index][5].toFixed(fix));//无冰无风的荷载
+            calc_line_weight_data("line_q0");       //从无冰无风荷载为基础，计算其他状态荷载数据
+        }
+
+        //加载绝缘子数据
+        function load_islt_info() {
+            var count = data_islt.length    //绝缘子数据总行数
+            for (var i = 0; i < count; i++) {
+                if (data_islt[i][2] != 1) {     //检查  data_islt[i][2]（绝缘子片数）
+                    //如果该行不是单片绝缘子的数据，即不是“1”片，则添加一个选项
+                    $("#islt_list").append("<option value=" + i + ">" + data_islt[i][0] + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + data_islt[i][1] + "×" + data_islt[i][2] + "</option>");
+                }
+            }
+
+        }
+
+        //根据用户选择，将选定的绝缘子串数据显示在页面的表中
+        function fill_islt_data_to_islt_table() {
+            var index = $("#islt_list").val();  //选定的序号
+            $("#islt_str").html(data_islt[index][0] + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + data_islt[index][1] + "×" + data_islt[index][2]);  //显示“型号  串数*片数”
+            if (data_islt[index][1] == 2) {
+                $("#td_islt_count").html("暂不支持");   //暂不支持双串情况下进行微调
+            }
+            else {      //单串，用户可以调整片数，自动计算
+                var s = "<input type='button' class='btn' id='btn_islt_count_dec' value='-'  onclick='islt_count_changed(-1)' / >";
+                s += "<input alt='绝缘子串片数' type='text' id='islt_count' class='input_box' style='width:30%;padding-right:10px;' value=" + data_islt[index][2] + " onchange='islt_count_changed(0)' />";
+                s += "<input type='button' class='btn' id='btn_islt_count_add' value='+'  onclick='islt_count_changed(1)' / >";
+                $("#td_islt_count").html(s);    //片数选择的表格单元格中，显示当前片数和+ -按钮
+            }
+            $("#islt_length").val(data_islt[index][3]);         //绝缘子串长度
+            $("#islt_q0").val(data_islt[index][4].toFixed(fix));//绝缘子串无冰无风荷重
+            calc_islt_weight_data();        //根据无冰无风荷重，计算其他状态荷重
+        }
+
+        //调整片数之后，进行相应的计算
+        function islt_count_changed(num) {
+            var index = $("#islt_list").val() * 1;  //当前选择的型号序号
+            var count = $("#islt_count").val() * 1; //当前片数
+            count = count * 1 + num;                //调整数量：num
+            var islt_type = data_islt[index][0];    //读入当前选择的型号
+            //作废 var str = data_islt[index][0] + "     " + data_islt[index][1] + "×" + count;
+            //作废 if ($("#islt_list").find("option[text='" + str + "']")) { $("#islt_list").find("option[text='" + str + "']").attr("selected", "true"); }
+            for (var i = 0; i < data_islt.length; i++) {    //检测每一行绝缘子串数据
+                if (data_islt[i][0] == islt_type && data_islt[i][1] == 1 && data_islt[i][2] == count) { //如果型号、串数匹配，片数==调整之后的片数
+                    var select = document.getElementById("islt_list");      //当前显示的“型号  串数*片数”
+                    for (j = 0; j < select.options.length; j++) {
+                        if (select.options[j].value == i) {                 //如果数据表中有数据
+                            document.getElementById("islt_list").options[j].selected = true;    //直接选定该行，显示数据即可
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $("#islt_count").val(count);                        //调整片数显示
+            $("#islt_str").html(data_islt[index][0] + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + data_islt[index][1] + "×" + count);    //变动显示的“型号  串数*片数”
+            $("#chk_use_table_islt").removeAttr("checked");     //“优先使用数据表数据”选中
+            calc_islt_weight_data();                            //根据无冰无风荷重，计算其他状态荷重
+            //作废 var count = $("#td_islt_count").val();
+        }
+
+        //从无冰无风荷载为基础，计算其他状态荷载数据
+        //输入参数：q0状态的html元件id
+        function calc_line_weight_data(q0_id) {
+            var id_prex = q0_id.replace("q0", "");      //从元件id获取前缀
+            var d = data_line[$("#" + id_prex + "list").val()][1];  //从前缀获取列表元件
+            var q0 = $("#" + q0_id).val() * 1;          //取得q0值
+            if ($("#chk_use_table_" + q0_id).attr("checked")) {         //如果要求使用数据表
+                q0 = data_line[$("#" + id_prex + "list").val()][5];     //使用表中的数据覆盖q0
+                $("#" + q0_id).val(data_line[$("#" + id_prex + "list").val()][5].toFixed(fix)); //更新显示的q0
+            }
+            var weather_index = $("#weather_zones").val() * 1;          //当前选定的气象区序号
+            for (j = 1; j < 4; j++) {
+                //对于每种气象环境：
+                b = $("#weather_q" + j + "_b").val() * 1;       //覆冰数据
+                v = $("#weather_q" + j + "_v").val() * 1;       //风速数据
+                var id = "#" + id_prex + "q" + j;
+                var q = calc_line_weight(q0, b, v, d);          //根据覆冰、风速，计算导线荷重
+                $(id).val(calc_line_weight(q0, b, v, d).toFixed(fix));
+                set_color(id, data_from_calc);                  //标记绿色，计算所得数据
+                if ($("#chk_use_table_" + q0_id).attr("checked")) {     //如果要求使用数据表
+                    for (k = 6; k < 13; k++) {
+                        if (data_line_index[k] == v + "/" + b && data_line[$("#" + id_prex + "list").val()][k]) {
+                            $(id).val(data_line[$("#" + id_prex + "list").val()][k].toFixed(fix));     // 查表取得荷重，覆盖现有计算所得
+                            set_color(id, data_from_table);    //标记蓝色，数据表数据
+                            break;
+                        }
+                    }
+
+                }
+            }
+            if (q0_id.indexOf("concentrate") >= 0) {    //如果是集中荷载的导线数据
+                calc_concentrate_P(q0_id);      //根据算出的单位荷载，更新集中荷重
+            }
+        }
+
+
+        //根据基础荷重，计算某状态的荷重
+        //输入：无冰无风荷重、覆冰厚度、风速、导线线径
+        //输出值：计算结果
+        //公式来自《手册》
+        function calc_line_weight(q1, b, v, d) {
+            var q3, q5;
+            q3 = q1 + 0.00283 * b * (d + b);
+            q5 = 0.075 * v * v * (d + 2 * b) * 0.001;
+            return Math.sqrt(q3 * q3 + q5 * q5);
+        }
+
+
+        //q0输入框发生变动，即手动修改了q0值
+        function q0_typed(q0_id) {
+            if (IsNumeric($("#" + q0_id).val())) {      //如果修改之后是数字
+                $("#chk_use_table_" + q0_id).removeAttr("checked");     //“优先使用数据表数据”不再选中
+                calc_line_weight_data(q0_id);           //计算其他状态的荷重
+                if (q0_id.indexOf("concentrate") >= 0) { calc_concentrate_P(q0_id); }       //如果是集中荷载的导线数据，根据算出的单位荷载，更新集中荷重
+            }
+        }
+
+
+        //计算集中荷载的荷重值
+        //输入参数：q0状态的html元件id
+        function calc_concentrate_P(q0_id) {
+            var len_id = q0_id.replace("q0", "length");     //引下线长度元件id
+            var len = $("#" + len_id).val() * 1;            //引下线长度
+            var mental_id = q0_id.replace("line", "mental").replace("q0", "weight");    //线夹重元件id
+            var mental = $("#" + mental_id).val() * 1;      //线夹重
+            for (i = 0; i < 4; i++) {                       //各个状态
+                var q_id = q0_id.substr(0, q0_id.length - 1);   //导线单位荷载元件id
+                var q = $("#" + q_id + i).val() * 1;            //导线单位荷载
+                var P_id = q0_id.replace("line", "P");          //集中荷载元件id
+                P_id = P_id.substr(0, P_id.length - 1);         
+                $("#" + P_id + i).val((q * len + mental).toFixed(fix));     //集中荷重=引下线单位荷重*引下线长度+线夹重
+            }
+        }
+
+
+        //计算绝缘子串荷重
+        function calc_islt_weight_data() {
+            var islt_type = data_islt[$("#islt_list").val()][0];    //绝缘子串型号
+            var q0 = $("#islt_q0").val() * 1;                       //绝缘子串无冰无风重量
+            var count = data_islt[$("#islt_list").val()][1] * data_islt[$("#islt_list").val()][2];  //总片数=串*片数
+            if ($("#islt_count")) {                     //如果是单串
+                count = $("#islt_count").val() * 1;     //串数=片数
+            }
+            if ($("#chk_use_table_islt").attr("checked")) { //如果采用数据表数据
+                q0 = data_islt[$("#islt_list").val()][5];   //查表得到q0
+                $("#islt_q0").val(q0.toFixed(fix));         //显示在页面中
+            }
+            var weather_index = $("#weather_zones").val() * 1;  //选中的气象区序号
+
+            for (j = 1; j < 4; j++) {
+                //对于每种气象环境：
+                b = $("#weather_q" + j + "_b").val() * 1;   //覆冰
+                v = $("#weather_q" + j + "_v").val() * 1;   //风速
+                var id = "#islt_q" + j;                     //每种气象环境的荷载元件id
+                var q = calc_islt_weight(islt_type, count, q0, b, v);   //计算绝缘子串荷重
+                $(id).val(q.toFixed(fix));      //填入页面
+                set_color(id, data_from_calc);  //标记绿色，计算所得数据
+                if ($("#chk_use_table_islt").attr("checked")) {         //如果要求使用数据表
+                    for (k = 5; k < 12; k++) {
+                        if (data_islt_index[k] == v + "/" + b && data_islt[$("#islt_list").val()][k]) {     //如果表中能够查到对应的风速、覆冰
+                            $(id).val(data_islt[$("#islt_list").val()][k].toFixed(fix));     //填入查表荷重
+                            set_color(id, data_from_table);    //标记蓝色，数据表数据
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        //根据基础荷重，计算某状态的荷重
+        //输入：绝缘子型号，绝缘子数量，无冰无风荷重、覆冰厚度、风速
+        //输出值：计算结果
+        //公式来自《手册》
+        function calc_islt_weight(islt_type, count, q1, b, v) {
+            var islt_index, b_index, v_index, q2, q4;
+            var bfound = false;
+            for (i = 0; i < data_islt_ice.length; i++) {
+                if (data_islt_ice[i][0] == islt_type) {     //查覆冰表中，是否录入了该绝缘子型号的数据
+                    islt_index = i;
+                    bfound = true;  //找到了
+                    break;
+                }
+            }
+            if (!bfound) { return 0; }  //未找到，返回值0
+            if (b == 0) { q2 = 0; }     //如果覆冰为0，q2=0
+            else {      //计算覆冰后的值
+                for (i = 0; i < data_islt_ice_index.length; i++) {
+                    if (data_islt_ice_index[i] == b) {      //查覆冰重量表，覆冰值对应的数据列号
+                        b_index = i;
+                        break;
+                    }
+                }
+                q2 = count * data_islt_ice[islt_index][b_index] + data_islt_ice[0][b_index];    //计算q2值
+            }
+            for (i = 0; i < data_islt_wind_index.length; i++) {
+                if (data_islt_wind_index[i] == b) {         //查受风面积表，覆冰对应的数据列号
+                    v_index = i;
+                    break;
+                }
+            }
+            q2 = q1 + q2;
+            q4 = 0.0375 * 1.1 * (count * data_islt_wind[islt_index][v_index] + data_islt_wind[0][1]) * v * v    //计算q4
+            return Math.sqrt(q2 * q2 + q4 * q4);        //返回值
+        }
+
+
+        //绝缘子串q0输入框发生变动，即手动修改了绝缘子串q0值
+        function islt_q0_typed() {
+            if (IsNumeric($("#islt_q0").val())) {                   //如果修改之后是数字
+                $("#chk_use_table_islt").removeAttr("checked");     //“优先使用数据表数据”不再选中
+                calc_islt_weight_data();                            //计算其他状态的荷重
+            }
+        }
+
+        
+
+        //气象条件输入框发生变动，即手动修改了某个风速或覆冰值
+        //输入参数：发生修改的元件id
+        function weather_typed(id) {
+            var v = $("#" + id).val();      //修改后的值
+            if (IsNumeric(v)) {             //如果是数字
+                $("input").each(function () {               //检测每一个input元件
+                    if ($(this).attr("type") == "text") {   //如果是文本框
+                        id = $(this).attr("id");            //当前元件的id
+                        if (id.substr(id.length - 2) == "q0" && id.indexOf("concentrate_P") < 0) {  //如果是导线的q0
+                            var id_prex = id.substr(0, id.length - 2);      //获取id前缀
+                            calc_line_weight_data(id_prex + "q0");          //修正导线各状态荷重
+                            calc_islt_weight_data();                        //修正绝缘子串荷重
+                        }
+                    }
+                });
+            }
+        }
+
+
+        //插入一个集中荷重表
+        //输入参数：新插入的集中荷重序号（第一个集中荷重序号是0）
+        function add_concentrate_table(index) {
+            var data = new Array(concentrate_count + 1);    //存储现有+新的一个全部集中荷重变量
+            for (i = 0; i < concentrate_count; i++) {
+                data[i] = store_concentrate_data(i);        //存储现有的全部集中荷重变量
+            }
+
+            //HTML页面增加一个集中荷重表
+            var s = "";
+            s += "<div id='concentrate_div_" + index + "'>";
+            s += "    <table cellspacing=0 cellpadding=0 style='margin:auto;border-collapse:collapse;margin-top:20px;margin_bottom:20px;' id='concentrate_table_" + index + "'>";
+            s += "        <colgroup>";
+            s += "            <col id='01' style='width:80px;' /> ";
+            s += "            <col id='01' style='width:80px;' /> ";
+            s += "            <col id='02' style='width:140px;' />";
+            s += "            <col id='03' style='width:140px;' />";
+            s += "            <col id='04' style='width:140px;' />";
+            s += "            <col id='05' style='width:140px;' />";
+            s += "            <col id='06' style='width:180px;' />";
+            s += "            <col id='07' style='width:100px;' />";
+            s += "            <col id='08' style='width:100px;' />";
+            s += "            <col id='09' style='width:100px;' />";
+            s += "            <col id='10' style='width:100px;' />";
+            s += "        </colgroup>";
+            s += "        <tr>";
+            s += "            <td rowspan=2 class='input_item_title color_concentrate'>集中荷载<br />P" + (index + 1).toString() + "</td>";
+            s += "            <td rowspan=2 class='input_item_title color_concentrate'><button class='btn' id='btn_concentrate_line_" + index + "_del' onclick=concentrate_del(" + index + ") >删除</button></td>";
+            s += "            <td class='input_cell_right color_concentrate'>导线选型</td>";
+            s += "            <td class='input_cell_right color_concentrate'>";
+            s += "                <select id='concentrate_line_" + index + "_list' class='input_box' style='text-align:right' onchange=\"fill_concentrate_data_to_concentrate_table('" + index + "')\">";
+            s += "                </select>";
+            s += "            </td>";
+            s += "            <td class='input_cell_right color_concentrate'>引下线长度(m)</td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "引下线长度' type='text' id='concentrate_line_" + index + "_length' class='input_box' onchange=calc_concentrate_P(\"concentrate_line_" + index + "_q0\") /></td>";
+            s += "            <td class='input_cell_center color_concentrate'>引下线荷载(kgf/m)<br/>";
+            s += "            <input type='checkbox' checked='checked' id='chk_use_table_concentrate_line_" + index + "_q0' onclick=calc_line_weight_data(\"concentrate_line_" + index + "_q0\") />优先使用数据表数据";
+            s += "            </td > ";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "无冰无风状态引下线荷重' type='text' id='concentrate_line_" + index + "_q0' class='input_box'   onchange=q0_typed(\"concentrate_line_" + index + "_q0\")  /></td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "有冰有风状态引下线荷重' type='text' id='concentrate_line_" + index + "_q1' class='input_box' /></td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "最大风速状态引下线荷重' type='text' id='concentrate_line_" + index + "_q2' class='input_box' /></td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "安装状态引下线荷重' type='text' id='concentrate_line_" + index + "_q3' class='input_box' /></td>";
+            s += "        </tr>";
+            s += "        <tr>";
+            s += "            <td class='input_cell_right color_concentrate'>线夹重量(kgf)</td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "线夹重量' type='text' id='concentrate_mental_" + index + "_weight' class='input_box' onchange=calc_concentrate_P(\"concentrate_line_" + index + "_q0\") /></td>";
+            s += "            <td class='input_cell_right color_concentrate'>距离左侧投影距离(m)</td>";
+            s += "            <td class='input_cell_center color_concentrate'><input alt='集中荷重P" + (index + 1) * 1 + "距离左侧的距离' type='text' id='concentrate_line_" + index + "_position' class='input_box' /></td>";
+            s += "            <td class='input_cell_center color_concentrate'>";
+            s += "                集中荷载(kgf/m)";
+            s += "            </td>";
+            s += "            <td class='input_cell_right color_concentrate'><input alt='无冰无风状态集中荷重P" + (index + 1) * 1 + "' type='text' id='concentrate_P_" + index + "_q0' class='input_box' /></td>";
+            s += "            <td class='input_cell_right color_concentrate'><input alt='有冰有风状态集中荷重P" + (index + 1) * 1 + "' type='text' id='concentrate_P_" + index + "_q1' class='input_box' /></td>";
+            s += "            <td class='input_cell_right color_concentrate'><input alt='最大风速状态集中荷重P" + (index + 1) * 1 + "' type='text' id='concentrate_P_" + index + "_q2' class='input_box' /></td>";
+            s += "            <td class='input_cell_right color_concentrate'><input alt='安装状态集中荷重P" + (index + 1) * 1 + "' type='text' id='concentrate_P_" + index + "_q3' class='input_box' /></td>";
+            s += "        </tr>";
+            s += "    </table>";
+            s += "</div >";
+            var h = $("#concentrate_div").html();
+            $("#concentrate_div").html(h + s);
+
+            //将存储的集中荷重数据恢复到对应的页面表格中
+            for (i = 0; i < concentrate_count; i++) {
+                load_concentrate_data(i, data[i]);      //恢复数据
+            }
+
+            //对于新增加的集中荷重表
+            load_line_info("concentrate_line_" + index + "_list");  //加载导线数据选择项
+            var line_index = $("#line_list").val() * 1;             //获取主导线型号
+            document.getElementById("concentrate_line_" + index + "_list").options[line_index].selected = true; //默认引下线导线和主导线型号相同
+            fill_concentrate_data_to_concentrate_table(index);      //填写集中荷载数据
+            calc_line_weight_data("concentrate_line_" + index + "_q0"); //计算集中荷重的引下线数据
+            calc_concentrate_P("concentrate_line_" + index + "_q0");    //计算集中荷重
+            concentrate_count++;        //标记集中荷重个数+1
+        }
+
+
+
+        //自动增加绝缘子串端部的引下线荷重
+        function add_concentrate_at_islt(index) {
+            var length = $("#length").val() * 1;        //绝缘子串型号
+            var dispersion = $("#dispersion").val() * 1;//架构高差
+            var ar = Math.atan(dispersion / length);    //高差角
+            var cos_ar = Math.cos(ar);                  //高差角的cos值
+            var islt_length = $("#islt_length").val() * 0.001;  //绝缘子串长度（m）
+            add_concentrate_table(index);               //增加左侧的集中荷重
+            $("#concentrate_line_" + index + "_position").val((islt_length * cos_ar).toFixed(fix));     //集中荷重位置=绝缘子串长度*cos，即计入高差后的投影长度
+            index++;    //序号+1
+            add_concentrate_table(index);               //再增加右侧的集中荷载
+            $("#concentrate_line_" + index + "_position").val((length - islt_length * cos_ar).toFixed(fix));    //集中荷重位置=跨距-绝缘子串长度*cos，
+        }
+
+        //一次性删除全部集中荷重
+        function del_all_concentrate(count) {
+            if (confirm("点击确定将删除全部集中荷载，此动作不可恢复。")) {
+                $("#concentrate_div").html("");     //页面集中荷载div的HTML清空
+                concentrate_count = 0;      //清空集中荷载数量
+            }
+        }
+
+        //集中荷重数据填入页面的表
+        //输入参数：填写表格的序号
+        function fill_concentrate_data_to_concentrate_table(index) {
+            var line_index = $("#concentrate_line_" + index + "_list").val() * 1;   //选中的导线型号序号
+            var q0_id = "concentrate_line_" + index + "_q0";    //q0的id
+            var d = data_line[line_index][1];           //查导线数据表，得到线径
+            var line_type = data_line[line_index][0];   //导线型号
+            var t_connector_index = -1;                 //线夹序号
+            for (i = 0; i < t_connector.length; i++) {
+                if (t_connector[i][4] == line_type) {   //检查线夹第4列是否适用于当前导线
+                    t_connector_index = i;
+                    break;
+                }
+            }
+            if (t_connector_index < 0) {                //如果没找到
+                pos1 = line_type.indexOf("-");          
+                var str = line_type.substr(pos1 + 1);
+                pos2 = str.indexOf("/");
+                str = str.substr(0, str.length - pos2);
+                for (i = 0; i < t_connector.length; i++) {
+                    if (t_connector[i][3] == str) {     //再检查线夹第3列是否适用于当前导线
+                        t_connector_index = i;
+                        break;
+                    }
+                }
+            }
+            if (t_connector_index < 0) {                //如果没找到
+                for (i = 0; i < t_connector.length; i++) {
+                    if (t_connector[i][1] <= d && t_connector[i][2] >= d) {     //检查线夹适用的线径
+                        t_connector_index = i;
+                        break;
+                    }
+                }
+            }       
+            if (t_connector < 0) {          //如果没找到
+                $("#concentrate_mental_" + index + "_weight").val("NaN");   //显示NaN
+            } else {
+                $("#concentrate_mental_" + index + "_weight").val(t_connector[t_connector_index][5]);   //填入线夹重量数据
+            }
+            $("#concentrate_line_" + index + "_length").val(5);         //引下线长度默认5m
+            $("#" + q0_id).val(data_line[line_index][5].toFixed(fix));  //引下线q0数据填入表中
+            calc_line_weight_data("concentrate_line_" + index + "_q0"); //根据引下线q0计算不同状态的导线荷重
+        }
+
+        //暂存集中荷载数据
+        //输入参数：需要暂存的序号
+        function store_concentrate_data(index) {
+            var res = new Array(13);
+            res[0] = $("#" + "concentrate_line_" + index + "_list").val() * 1;
+            res[1] = $("#" + "concentrate_line_" + index + "_length").val();
+            res[2] = ($("#" + "chk_use_table_concentrate_line_" + index + "_q0").attr("checked")) ? 1 : 0;
+            res[3] = $("#" + "concentrate_line_" + index + "_q0").val();
+            res[4] = $("#" + "concentrate_line_" + index + "_q1").val();
+            res[5] = $("#" + "concentrate_line_" + index + "_q2").val();
+            res[6] = $("#" + "concentrate_line_" + index + "_q3").val();
+            res[7] = $("#" + "concentrate_mental_" + index + "_weight").val();
+            res[8] = $("#" + "concentrate_line_" + index + "_position").val();
+            res[9] = $("#" + "concentrate_P_" + index + "_q0").val();
+            res[10] = $("#" + "concentrate_P_" + index + "_q1").val();
+            res[11] = $("#" + "concentrate_P_" + index + "_q2").val();
+            res[12] = $("#" + "concentrate_P_" + index + "_q3").val();
+            return res;
+        }
+
+
+        //加载已经暂存的集中荷载数据
+        //输入参数：需要加载的序号，暂存的参数数组
+        function load_concentrate_data(index, args) {
+            $("#" + "concentrate_line_" + index + "_list").val(args[0]);
+            $("#" + "concentrate_line_" + index + "_length").val(args[1]);
+            args[2] == 1 ? $("#" + "chk_use_table_concentrate_line_" + index + "_q0").attr("checked", "checked") : $("#" + "chk_use_table_concentrate_line_" + index + "_q0").removeAttr("checked");
+            $("#" + "chk_use_table_concentrate_line_" + index + "_q0").val(args[2]);
+            $("#" + "concentrate_line_" + index + "_q0").val(args[3]);
+            $("#" + "concentrate_line_" + index + "_q1").val(args[4]);
+            $("#" + "concentrate_line_" + index + "_q2").val(args[5]);
+            $("#" + "concentrate_line_" + index + "_q3").val(args[6]);
+            $("#" + "concentrate_mental_" + index + "_weight").val(args[7]);
+            $("#" + "concentrate_line_" + index + "_position").val(args[8]);
+            $("#" + "concentrate_P_" + index + "_q0").val(args[9]);
+            $("#" + "concentrate_P_" + index + "_q1").val(args[10]);
+            $("#" + "concentrate_P_" + index + "_q2").val(args[11]);
+            $("#" + "concentrate_P_" + index + "_q3").val(args[12]);
+        }
+
+        //删除某个集中荷载
+        //输入参数：待删除的序号
+        function concentrate_del(index) {
+            if (confirm("点击确定将删除集中荷载P" + (index + 1) * 1 + "，此动作不可恢复。")) {
+                var data = new Array(concentrate_count - index - 1);
+                for (i = 0; i < concentrate_count - index - 1; i++) {
+                    data[i] = store_concentrate_data(i + index + 1);        //待删除的集中荷载之后的每个表，逐个缓存
+                    load_concentrate_data(i + index, data[i]);      //逐个恢复到前一个表中
+                }
+                $("#concentrate_div_" + (concentrate_count - 1) * 1).remove();  //删除最后一个集中荷载数据表
+                concentrate_count--;    //总数-1
+            }
+        }
+        //以上主要处理了填写基础数据中的部分辅助自动化功能
+    </script>
+
+    <script type="text/javascript">
+
+        //以下主要是根据已经确定的数据表，进行拉力计算，并生成计算输出表格
+
+
+        var q0_t0, q0_t1, q1_b, q2_v, q3_v, q1_v;
+        //最低气温，最高气温，覆冰厚度q7，最大风速q6，安装检修风速q6’，覆冰风速q7
+
+        var voltage, length, dispersion, sag;
+        //电压等级，架构跨距，高差，允许弧垂
+
+        var line_type, line_d, line_s, line_a, line_e, epsi, ae;
+        //导线型号，导线直径，导线截面，导线膨胀系数，弹性模量，epsilong，a*E
+
+        var islt_type, islt_count, islt_length
+        //绝缘子串型号、片数、长度
+
+        var ar;
+        var cos_ar;
+        //架构高差引起的角度alpha
+
+        var single_status = 4;
+        //最初的四种状态：最高温度、有冰有风、最大风速，最低温度
+
+        var states_count;
+        //所有计算状态
+        //q1，q7，q6，q1,【q6'(100kg)位于每一个集中荷载点，q6'(150kg)位于每一个集中荷载点】*（-15℃，30℃），q6'导线安装（40℃~-30℃共install_count个）
+        //数量是 single_status + concentrate_count*2*2 + install_count
+
+        var line_q;
+        //不同状态的导线荷载
+
+        var islt_q;
+        //不同状态的绝缘子串荷载
+
+        var concentrate_q;
+        //不同状态的集中单位荷载
+
+        var concentrate_p;
+        //不同状态的集中荷载
+
+        var concentrate_positions;
+        //不同状态的集中荷载位置
+
+        var person_weight;
+        //不同状态的上人荷载
+
+        var person_position;
+        //不同状态的上人位置
+
+
+        var status_prex;
+        //不同状态代号
+
+        var status_str;
+        //不同状态描述
+
+        var RA_plus;    //支座反力RA-
+        var RB_plus;    //未用到。
+        var RA;         //最终反力RA
+        var RB;         //未用到
+        var D;          
+        var M;
+        var Cm;
+        var Cn;
+        var tal_n;
+        var theta_n;
+        var theta_m;
+        var delta_theta;
+        var B;
+        var A;
+        var tal_m;
+        var H;
+        var f;
+        var line_length;    //施工安装导线长度；
+
+        var install_count = 70 / 5 + 1; //从40度递减5，到30度
+
+        //不同状态的状态方程求解变量
+
+        //启动计算的入口：
+        function go() {
+            if (!check_input()) { return false; }   //检验输入，未通过则退出
+            if (!check_near_concentrate()) { return false; }    //检测集中荷载特别靠近的情况
+            def_arrays();       //初始化各数组
+            read_input();       //读输入数据
+            init_calc();        //初始化计算条件
+            draw_figure();      //绘制架构图
+            write_output_input_data();          //输出：输入数据表
+            write_output_concentrate_data();    //输出：集中荷载表
+            calc_state();       //不同状态进行计算
+            if (calc_output_calc_tm_H_f()) {    //如果找到最大弧垂的状态，则：
+                write_output_calc_result();     //输出：计算结果
+                write_output_install_data();    //输出：安装数据
+                draw_output_install_figure();   //绘制：安装图
+                alert("计算完毕");
+                $("#gen_report").show();
+                return true;
+            } else {
+                alert("未找到弧垂最大的状态");
+                return false;
+            }
+        }
+
+        //检验输入，未通过则退出
+        function check_input() {
+            var b = true;
+            $("input").each(function () {
+                if ($(this).attr("type") == "text") {   //检查每一个文本框
+                    id = $(this).attr("id");
+                    if ($(this).val() == "") {
+                        alert("请填写：" + $(this).attr("alt"));    //不能为空
+                        b = false;
+                        return b;
+                    }
+                    if (id != "project" && id != "frame") {
+                        if (id == "weather_q0_t0" || id == "weather_q0_t1" || id == "weather_q1_t" || id == "weather_q2_t" || id == "weather_q3_t") {
+                            if (!IsNumeric(($(this).val()))) {
+                                alert($(this).attr("alt") + "的值不是数值，请核实");      //必须是数值
+                                b = false;
+                                return b;
+                            }
+                        } else if (!IsPositiveNumeric($(this).val())) {
+                            alert($(this).attr("alt") + "的值不是正数，请核实");          //必须是正数
+                            b = false;
+                            return b;
+                        }
+                    }
+                    $(this).css("color", "red");        //检查过的标记为红色
+                }
+            });
+            return b;
+        }
+
+        //检测集中荷载特别靠近的情况
+        function check_near_concentrate() {
+            var b = true;
+            var length = $("#length").val() * 1;
+            var dispersion = $("#dispersion").val() * 1;
+            var ar = Math.atan(dispersion / length);
+            var cos_ar = Math.cos(ar);
+            concentrate_positions = new Array(concentrate_count);
+            var b_concentrate_at_left_islt = false;
+            var b_concentrate_at_right_islt = false;
+            for (i = 0; i < concentrate_count; i++) {
+                var islt_length = $("#islt_length").val() * 0.001;
+                concentrate_positions[i] = $("#concentrate_line_" + i + "_position").val() * 1;
+                if (Math.abs(concentrate_positions[i] - islt_length * cos_ar) < 0.001) { b_concentrate_at_left_islt = true; }   //如果集中荷载位置和绝缘子串端部位置相同，则认为找到了端部引下线
+                if (Math.abs(concentrate_positions[i] - (length - islt_length * cos_ar)) < 0.001) { b_concentrate_at_right_islt = true; }//如果集中荷载位置和绝缘子串端部位置相同，则认为找到了端部引下线
+                if (concentrate_positions[i] > length) {
+                    alert("集中荷载距离左侧挂点沿线长度超出了跨内导线总长度，请核实。");
+                    b = false;
+                    return b;
+
+                }
+            }
+            if (concentrate_count <= 0 || !b_concentrate_at_left_islt) {
+                alert("未发现右侧绝缘子串端部的集中荷载数据，请补充。");
+                b = false;
+                return b;
+            }
+
+            if (concentrate_count <= 0 || !b_concentrate_at_right_islt) {
+                alert("未发现右侧绝缘子串端部的集中荷载数据，请补充。");
+                b = false;
+                return b;
+            }
+            for (i = 0; i < concentrate_count - 1; i++) {
+                for (j = i + 1; j < concentrate_count; j++) {
+                    if (Math.abs(concentrate_positions[i] - concentrate_positions[j]) < 0.1) {
+                        var concreate_line_type_1 = $("#concentrate_line_" + i + "_list").val();
+                        var concreate_line_type_2 = $("#concentrate_line_" + j + "_list").val();
+                        var s = "集中荷载P" + (i + 1) * 1 + "与集中荷载P" + (j + 1) * 1 + "距离很近，是否需要修改？\n点击确定将继续，点击取消，将终止计算。";
+                        if (confirm(s)) {
+                            //alert("continue");
+                            //此处将来补充自动合并集中荷载的代码
+                            //return true;
+                        } else {
+                            b = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            return b;
+        }
+
+        //初始化各数组
+        function def_arrays() {
+            states_count = concentrate_count * 4 + single_status + install_count;
+            //所有计算状态
+            //q1，q7，q6，【q6'(100kg)所有集中荷载点，q6'(150kg)所有集中荷载点】*（-15℃，30℃），q6'导线安装（-30℃~30℃共install_count个）
+            //数量是 single_status + concentrate_count*2*2 + install_count
+
+            line_q = new Array(4);
+            //不同状态的导线荷载
+
+            islt_q = new Array(4);
+            //不同状态的绝缘子串荷载
+
+            concentrate_q = new Array(concentrate_count);
+            for (i = 0; i < concentrate_count; i++) {
+                concentrate_q[i] = new Array(4);
+            }
+            //不同状态的集中单位荷载
+
+            concentrate_p = new Array(concentrate_count);
+            for (i = 0; i < concentrate_count; i++) {
+                concentrate_p[i] = new Array(4);
+            }
+            //不同状态的集中荷载
+
+            //concentrate_position = new Array(concentrate_count);
+            //在检查阶段已经初始化，读入了数据
+
+            person_weight = new Array(states_count);
+            //不同状态的上人荷载
+
+            person_position = new Array(states_count);
+            //不同状态的上人位置
+
+            P_for_calc = new Array(states_count);
+            for (i = 0; i < states_count; i++) {
+                P_for_calc[i] = new Array(concentrate_count);
+            }
+
+            status_prex = new Array(states_count);
+            //不同状态代号
+
+            status_str = new Array(states_count);
+            //不同状态描述
+
+
+            RA_plus = new Array(states_count);
+            RB_plus = new Array(states_count);
+            RA = new Array(states_count);
+            RB = new Array(states_count);
+            D = new Array(states_count);
+            M = new Array(states_count);
+            Cm = new Array(states_count);
+            Cn = new Array(states_count);
+            tal_n = new Array(states_count);
+            theta_n = new Array(states_count);
+            theta_m = new Array(states_count);
+            delta_theta = new Array(states_count);
+            B = new Array(states_count);
+            A = new Array(states_count);
+            tal_m = new Array(states_count);
+            H = new Array(states_count);
+            f = new Array(states_count);
+            line_length = new Array(states_count);
+        }
+
+        //初始化计算条件
+        function init_calc() {
+
+            //不同状态代号
+            status_prex[0] = "1";       //最高温度q1
+            status_prex[1] = "7";       //有冰有风q7
+            status_prex[2] = "6";       //最大风速q6
+            status_prex[3] = "1";       //最低温度q1
+            for (i = single_status; i < states_count; i++) {
+                status_prex[i] = "6'";  //停电检修、带电检修、施工安装，均用q6'状态
+            }
+
+            //不同状态描述
+            status_str[0] = "最高温度";
+            status_str[1] = "有冰有风";
+            status_str[2] = "最大风速";
+            status_str[3] = "最低温度";
+
+            for (i = single_status; i < single_status + concentrate_count * 2; i++) {
+                status_str[i] = "停电检修";
+            }
+            for (i = single_status + concentrate_count * 2; i < single_status + concentrate_count * 4; i++) {
+                status_str[i] = "带电检修";
+            }
+            for (i = single_status + concentrate_count * 4; i < single_status + concentrate_count * 4 + install_count; i++) {
+                status_str[i] = "施工安装";
+            }
+
+
+
+
+            //不同状态的上人荷载
+            for (i = 0; i < states_count; i++) {
+                person_weight[i] = 0;
+            }
+            for (i = single_status; i < single_status + concentrate_count * 2; i++) {
+                if (voltage < 331) {
+                    person_weight[i] = 100;
+                } else {
+                    person_weight[i] = 200;
+                }
+            }
+            for (i = single_status + concentrate_count * 2; i < single_status + concentrate_count * 4; i++) {
+                if (voltage < 331) {
+                    person_weight[i] = 150;
+                } else {
+                    person_weight[i] = 350;
+                }
+            }
+
+            //不同状态的上人位置
+            for (i = 0; i < states_count; i++) {
+                person_position[i] = -1;        //不上人，记为 -1
+            }
+            var p = 0;
+            for (i = single_status; i < single_status + concentrate_count * 2; i++) {       //100kg，每个集中荷载点
+                person_position[i] = p;     //-15度，位置
+                person_position[i + 1] = p; //30度，位置
+                i++;    //一次处理两个点
+                p++;    //移到下一个集中荷载点
+            }
+            p = 0;
+            for (i = single_status + concentrate_count * 2; i < single_status + concentrate_count * 4; i++) {   //150kg，每个集中荷载点
+                person_position[i] = p;
+                person_position[i + 1] = p;
+                i++;
+                p++;
+            }
+
+
+            //theta_n
+            //参考手册，最高温度都是70度
+            for (i = 0; i < states_count; i++) {
+                theta_n[i] = 70;
+            }
+            theta_n[0] = -5;
+
+            //theta_m
+            theta_m[0] = 70;
+            theta_m[1] = -5;
+            theta_m[2] = -5;
+            theta_m[3] = -40;
+            for (i = single_status; i < single_status + concentrate_count * 4; i++) {
+                theta_m[i] = -15;
+                i++;
+                theta_m[i] = 30;
+            }
+
+            //参考手册，施工安装采用40度~-30度
+            for (i = 0; i < install_count; i++) {
+                theta_m[single_status + concentrate_count * 4 + i] = 40 - i * 5;
+            }
+        }
+
+        //读输入数据
+        function read_input() {
+            q0_t0 = $("#weather_q0_t0").val() * 1;
+            q0_t1 = $("#weather_q0_t1").val() * 1;
+            q1_b = $("#weather_q1_b").val() * 1;
+            q1_v = $("#weather_q1_v").val() * 1;
+            q2_v = $("#weather_q2_v").val() * 1;
+            q3_v = $("#weather_q3_v").val() * 1;
+            //var q0_t0, q0_t1, q1_b, q2_v, q3_v, q1_v;
+            //最低气温，最高气温，覆冰厚度q7，最大风速q6，安装检修风速q6’，覆冰风速q7
+            theta_m[3] = q0_t0;
+
+
+            voltage = $("#voltage").val() * 1;
+            length = $("#length").val() * 1;
+            dispersion = $("#dispersion").val() * 1;
+            sag = $("#sag").val() * 1;
+            //var voltage, length, dispersion, sag;
+            //电压等级，架构跨距，高差，允许弧垂
+
+            ar = Math.atan(dispersion / length);
+            cos_ar = Math.cos(ar);
+            //var ar;
+            //架构高差引起的角度alpha
+
+            islt_type = data_islt[$("#islt_list").val() * 1][0];
+            islt_count = $("#islt_count").val() * 1;
+            islt_length = $("#islt_length").val() * 0.001 * cos_ar;
+            //var islt_type, islt_count, islt_length
+            //绝缘子串型号、片数、长度
+
+
+            line_type = data_line[$("#line_list").val() * 1][0];
+            line_d = $("#line_d").val() * 1;
+            line_s = $("#line_s").val() * 1;
+            line_a = $("#line_a").val() * 1;
+            line_e = $("#line_e").val() * 1;
+
+
+            epsi = (line_e * Math.cos(ar)) / (2 * line_s * line_s * (length - 2 * islt_length));
+            ae = line_a * line_e;
+            //var line_type, line_d, line_s, line_a, line_e, epsi, ae
+            //导线型号，导线直径，导线截面，导线膨胀系数，弹性模量，epsilong，a*E
+
+            var temp = new Array(concentrate_count);
+            for (i = 0; i < 4; i++) {
+                line_q[i] = $("#line_q" + i).val() * 1;
+                islt_q[i] = $("#islt_q" + i).val() * 1;
+            }
+            //不同状态的导线荷载
+            //不同状态的绝缘子串荷载
+
+            for (i = 0; i < concentrate_count; i++) {
+                //concentrate_position = $("#concentrate_line_" + i + "_position").val() * 1;
+                //在检查数据阶段已经初始化并读入了数据
+                temp[i] = i;
+            }
+            //不同状态的集中荷载位置
+
+            for (i = 0; i < concentrate_count - 1; i++) {
+                for (j = i + 1; j < concentrate_count; j++) {
+                    if (concentrate_positions[j] < concentrate_positions[i]) {
+                        var t = concentrate_positions[j];
+                        concentrate_positions[j] = concentrate_positions[i];
+                        concentrate_positions[i] = t;
+                        t = temp[j];
+                        temp[j] = temp[i];
+                        temp[i] = t;
+                    }
+                }
+            }
+            //不同状态的集中荷载位置排序
+
+
+            for (i = 0; i < concentrate_count; i++) {
+                for (j = 0; j < 4; j++) {
+                    var t = temp[i];
+                    concentrate_q[i][j] = $("#concentrate_line_" + t + "_q" + j).val() * 1;
+                    concentrate_p[i][j] = $("#concentrate_P_" + t + "_q" + j).val() * 1;
+                    //按照排序结果读入集中荷载
+                }
+            }
+
+        }
+
+        //绘制架构图
+        function draw_figure() {
+            var s = "";
+            s += "<canvas id='output_figure_canvas' width='900' height='500' style='margin:auto'>            </canvas>";
+            $("#output_figure").html(s);
+            var c = document.getElementById("output_figure_canvas");    //绘图画布对象
+            do_draw_figure(c);  //在要求的画布上绘图
+        }
+
+        //在要求的画布上绘图
+        //输入参数：画布对象
+        function do_draw_figure(c) {
+            var w = 800;        
+            var h = 400;
+            var ctx = c.getContext("2d");
+
+            var x_fac = length * 1.0 / w;    //缩放比例因子
+            var f = dispersion;     //设定绘图中，弧垂=高差，纯粹为了视觉美观
+            if (dispersion == 0) { f = 5; }     //如果无高差，弧垂取5m
+            var y_fac = (f + dispersion) / 200; //纵向比例因子，400高的画布，分为200高的两个部分
+            ctx.fillStyle = "#eeeeee";
+            ctx.fillRect(0, 0, 900, 500);   //灰色背景
+            ctx.fillStyle = "#000000";
+            ctx.strokeStyle = "#000000";
+
+            ctx.beginPath();
+            ctx.moveTo(50, 300);
+            ctx.quadraticCurveTo(450, 500, 850, 300 + dispersion / y_fac);      //绘制导线弧
+            ctx.stroke();
+
+            //for (i = 50; i < 801; i = i + 50) { //绘制横坐标参考线
+            //    ctx.beginPath();
+            //    ctx.moveTo(i, 200);
+            //    ctx.lineTo(i, 300);
+            //    ctx.stroke();
+            //    ctx.font = "60px";
+            //    ctx.fillText(((i-50) * x_fac).toFixed(2), i, 200);
+
+            //}
+            ctx.font = "15px Arial";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#0000ff";
+
+            if (dispersion != 0) {
+                //绘制高差
+                ctx.beginPath();
+                ctx.moveTo(865, 300);       //高点尺寸界限，绘图坐标取300
+                ctx.lineTo(885, 300);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(865, 300 + dispersion / y_fac);      //高差低点尺寸界限，绘图坐标从300开始，依据高差进行折算
+                ctx.lineTo(885, 300 + dispersion / y_fac);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(875, 300);                           //纵向尺寸线
+                ctx.lineTo(875, 300 + dispersion / y_fac);
+                ctx.stroke();
+
+                ctx.fillText(dispersion + "m", 870, 300 + dispersion / 2 / y_fac);      //标注高差
+
+            }
+
+            ctx.font = "12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#000000";
+
+            for (i = 0; i < concentrate_count; i++) {
+                //在弧垂线上，表示每一个集中荷载
+                ctx.beginPath();
+                var x = 50 + concentrate_positions[i] / x_fac;
+                ctx.moveTo(x, 300);
+                ctx.lineTo(x, 450);
+                ctx.stroke();
+
+                ctx.moveTo(x - 3, 440);
+                ctx.lineTo(x, 450);
+                ctx.stroke();
+                ctx.lineTo(x + 3, 440);
+                ctx.stroke();
+
+                ctx.fillText("P" + (i + 1), 50 + concentrate_positions[i] / x_fac, 460);
+            }
+
+            //绘制水平投影线
+            ctx.beginPath();
+            ctx.moveTo(50, 200);
+            ctx.lineTo(55, 200);
+            ctx.stroke();
+            var l = islt_length / x_fac - 10;
+            ctx.rect(55, 190, l, 20);                       //绘制绝缘子串
+            ctx.stroke();
+            ctx.moveTo(55 + l, 200);
+            ctx.lineTo(900 - 55 - l, 200);
+            ctx.stroke();
+            ctx.rect(900 - 55 - l, 190, l, 20);             //绘制绝缘子串
+            ctx.stroke();
+            ctx.moveTo(845, 200);
+            ctx.lineTo(850, 200);
+            ctx.stroke();
+
+            for (i = 0; i < concentrate_count; i++) {
+                //在水平投影线上，绘制每一个集中荷载
+                ctx.beginPath();
+                var x = 50 + concentrate_positions[i] / x_fac;
+                ctx.moveTo(x, 180);
+                ctx.lineTo(x, 240);
+                ctx.stroke();
+
+                ctx.moveTo(x - 3, 230);
+                ctx.lineTo(x, 240);
+                ctx.stroke();
+                ctx.lineTo(x + 3, 230);
+                ctx.stroke();
+
+                ctx.fillText("P" + (i + 1), 50 + concentrate_positions[i] / x_fac, 250);
+            }
+
+
+            //绘制尺寸标注
+            ctx.beginPath();
+            ctx.moveTo(50, 50);
+            ctx.lineTo(50, 150);
+            ctx.stroke();
+            ctx.moveTo(850, 50);
+            ctx.lineTo(850, 150);
+            ctx.stroke();
+
+            ctx.moveTo(50, 80);
+            ctx.lineTo(850, 80);
+            ctx.stroke();
+            draw_short_line(ctx, 50, 80);
+            draw_short_line(ctx, 850, 80);
+            ctx.fillText(length + "m", 450, 70);
+
+
+            ctx.moveTo(50, 80);
+            ctx.lineTo(850, 80);
+            ctx.stroke();
+            ctx.fillText(length + "m", 450, 70);
+
+            ctx.moveTo(50, 120);
+            ctx.lineTo(850, 120);
+            ctx.stroke();
+            draw_short_line(ctx, 50, 120);
+            draw_short_line(ctx, 850, 120);
+            var p0 = 50;
+            for (i = 0; i < concentrate_count; i++) {
+                //在尺寸标注上，标注每一个集中荷载
+                ctx.beginPath();
+                var x = 50 + concentrate_positions[i] / x_fac;
+                var position = (x - p0) / 2 + p0;
+                var s;
+                if (i == 0) {
+                    s = (islt_length).toFixed(fix);
+                }
+                else {
+                    s = (concentrate_positions[i] - concentrate_positions[i - 1]).toFixed(fix);
+                }
+                ctx.moveTo(x, 100);
+                ctx.lineTo(x, 140);
+                ctx.stroke();
+                draw_short_line(ctx, x, 120);
+                ctx.fillText(s, position, 110);
+                p0 = x;
+            }
+            ctx.fillText((islt_length).toFixed(fix), 850 - concentrate_positions[0] / x_fac, 110);
+        }
+
+        //绘制尺寸标注的短斜线
+        //输入参数：画布对象，短斜线的中心点x，y
+        function draw_short_line(ctx, center_x, center_y) {
+            ctx.beginPath();
+            ctx.moveTo(center_x - 4, center_y + 4);
+            ctx.lineTo(center_x + 4, center_y - 4);
+            ctx.stroke();
+        }
+
+        //输出：输入数据表
+        function write_output_input_data() {
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+
+            s += "<tr>";
+            if (dispersion != 0) {
+                s += "<td colspan=5 class='input_cell_center' style='font-weight:bold;border:none' >气象条件、导线与绝缘子串荷重</td>";
+            } else {
+                s += "<td colspan=4 class='input_cell_center' style='font-weight:bold' >气象条件、导线与绝缘子串荷重</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >气象条件</td>";
+            s += "<td class='input_cell_center' >导线特性</td>";
+            s += "<td class='input_cell_center' ";
+            if (dispersion != 0) { s += " colspan=2 "; }
+            s += ">导线荷重<br/>(kgf/m)</td>";
+            s += "<td class='input_cell_center' >绝缘子串荷重(kgf/m)<br/>（" + islt_count + "片，型号" + islt_type + "&nbsp;长度：" + islt_length + "）</td>";
+            s += "</tr>";
+
+            s += "<tr>";
+            s += "<td class='input_cell_center' >";
+            s += "最高气温&nbsp;" + q0_t1 + "℃<br/>";
+            s += "最低气温&nbsp;" + q0_t0 + "℃<br/>";
+            s += "覆冰厚度&nbsp;" + q1_b + "mm<br/>";
+            s += "最大风速&nbsp;" + q2_v + "m/s<br/>";
+            s += "安装检修风速&nbsp;" + q3_v + "m/s<br/>";
+            s += "覆冰风速&nbsp;" + q1_v + "m/s<br/>";
+            s += "</td>";
+
+            s += "<td class='input_cell_center' >";
+            s += "导线型号&nbsp;" + line_type + "<br/>";
+            s += "外径 d=" + line_d + "mm<br/>";
+            s += "截面 s=" + line_s + "mm<sup>2</sup><br/>";
+            s += "温度膨胀系数 αx=" + line_a * 1E6 + "×10<sup>-6</sup>(1/°C)<br/>";
+            s += "弹性模数 E=" + line_e + "(N/mm<sup>2</sup>)<br/>";
+            s += "ξ=" + epsi.toFixed(fix) + "(N/m·mm<sup>6</sup>)<br/>";
+            s += "αx·E=" + ae + "(N/mm<sup>2</sup>·℃)<br/>";
+            s += "</td>";
+
+
+            s += "<td class='input_cell_center'  >";
+            s += "q1=" + line_q[0] + "<br/>";
+            s += "q6=" + line_q[2] + "<br/>";
+            s += "q6'=" + line_q[3] + "<br/>";
+            s += "q7=" + line_q[1] + "<br/>";
+            s += "</td>";
+
+            if (dispersion != 0) {
+                s += "<td class='input_cell_center'  >";
+                s += "q1/cosγ=" + (line_q[0] / cos_ar).toFixed(fix) + "<br/>";
+                s += "q6/cosγ=" + (line_q[2] / cos_ar).toFixed(fix) + "<br/>";
+                s += "q6'/cosγ=" + (line_q[3] / cos_ar).toFixed(fix) + "<br/>";
+                s += "q7/cosγ=" + (line_q[1] / cos_ar).toFixed(fix) + "<br/>";
+                s += "</td>";
+
+            }
+
+            s += "<td class='input_cell_center' >";
+            s += "Q1=" + islt_q[0] + "<br/>";
+            s += "Q6=" + islt_q[2] + "<br/>";
+            s += "Q6'=" + islt_q[3] + "<br/>";
+            s += "Q7=" + islt_q[1] + "<br/>";
+            s += "</td>";
+
+            s += "</tr></table>";
+            $("#output_input_data").html(s);
+        }
+
+        //输出：集中荷载表
+        function write_output_concentrate_data() {
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+            s += "<tr><td colspan=12 class='input_cell_center' style='font-weight:bold;border:none' >集中荷重表</td></tr>";
+
+            s += "<tr>";
+            s += "<td rowspan=2 class='input_cell_center'>编号</td>";
+            s += "<td rowspan=2 class='input_cell_center'>引下线<br/>型号</td>";
+            s += "<td rowspan=2 class='input_cell_center'>引下线<br/>长度<br/>(m)</td>";
+            s += "<td colspan=4 class='input_cell_center'>不同气象条件下引下线单位荷重<br/>(kgf/m)</td>";
+            s += "<td rowspan=2 class='input_cell_center'>线夹重<br/>(kgf)</td>";
+            s += "<td colspan=4 class='input_cell_center'>不同气象条件下集中荷重<br/>(kgf/m)</td>";
+            s += "</tr>";
+
+            s += "<tr>";
+            s += "<td class='input_cell_center'>状态1</td>";
+            s += "<td class='input_cell_center'>状态6</td>";
+            s += "<td class='input_cell_center'>状态6'</td>";
+            s += "<td class='input_cell_center'>状态7'</td>";
+            s += "<td class='input_cell_center'>状态1</td>";
+            s += "<td class='input_cell_center'>状态6</td>";
+            s += "<td class='input_cell_center'>状态6'</td>";
+            s += "<td class='input_cell_center'>状态7'</td>";
+            s += "</tr>";
+
+            for (i = 0; i < concentrate_count; i++) {
+                s += "<tr>";
+                s += "<td class='input_cell_center'>P" + (i + 1) + "</td>";
+                s += "<td class='input_cell_center'>" + data_line[$("#concentrate_line_" + i + "_list").val() * 1][0] + "</td>";
+                s += "<td class='input_cell_center'>" + $("#concentrate_line_" + i + "_length").val() + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_q[i][0] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_q[i][2] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_q[i][3] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_q[i][1] + "</td>";
+                s += "<td class='input_cell_center'>" + $("#concentrate_mental_" + i + "_weight").val() + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_p[i][0] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_p[i][2] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_p[i][3] + "</td>";
+                s += "<td class='input_cell_center'>" + concentrate_p[i][1] + "</td>";
+                s += "</tr>";
+
+            }
+            s += "</table>";
+            $("#output_concentrate_data").html(s);
+        }
+
+        //不同状态进行计算
+        function calc_state() {
+            $("#output_calc_state").html("");
+            for (c = 0; c < states_count; c++) {        //计算每一种状态
+                calc_each_state(c);     
+            }
+        }
+
+        //每一种状态进行拉力计算
+        //输入参数：状态序号
+        function calc_each_state(index) {
+            var tempL = new Array(concentrate_count + 2);       //导线临时分段。按集中荷重分段，所以是集中荷重+1.考虑查找中间的弯矩0点，再+1
+            var tempqL = new Array(concentrate_count + 2);      //临时分段对应的荷重
+            var P = new Array(concentrate_count + 2);           //集中荷载。考虑找到弯矩0点之后，中间要插入一个分段，所以+1.
+            var q_index = index;                                
+            if (index == single_status - 1) { q_index = 1; }    //如果是最低温度状态，取q[1]（即有冰有风q7）
+            if (index > single_status - 1) { q_index = 3; }     //如果是各种安装状态，取q[3]（即q6'）
+
+            //作废 tempL[0] = concentrate_positions[0] * cos_ar;
+            tempL[0] = concentrate_positions[0] ;               //读取各段长度
+            for (i = 1; i < concentrate_count; i++) {
+                tempL[i] = (concentrate_positions[i] - concentrate_positions[i - 1]);
+            }
+            tempL[concentrate_count] = tempL[0];                //最右侧绝缘子串长度
+            for (i = 0; i < concentrate_count + 1; i++) {       //各段荷重
+                if (i == 0 || i == concentrate_count) { tempqL[i] = islt_q[q_index]; }      //首末段荷重=绝缘子重
+                else { tempqL[i] = tempL[i] * line_q[q_index] / cos_ar; }               //中间各段荷重=导线长度*单位荷重，考虑高差影响。
+            }
+            for (i = 0; i < concentrate_count; i++) {       //读入集中荷重
+                P[i] = concentrate_p[i][q_index];
+            }
+            if (person_position[index] > -1) { P[person_position[index]] += person_weight[index]; }     //如果有上人，计入对应的集中荷重点
+            P[concentrate_count] = 0;
+            P[concentrate_count + 1] = 0;
+
+            var ra_str = "<span style='text-decoration:overline'>RA</span>=";       //显示的RA-计算公式
+            RA_plus[index] = islt_q[q_index];           //计算RA-
+            ra_str += islt_q[q_index] + "+";
+            RA_plus[index] += line_q[q_index] / cos_ar * (length - 2 * islt_length) / 2;
+            ra_str += (line_q[q_index] / cos_ar).toFixed(fix) + "×" + (length - 2 * islt_length).toFixed(fix) + "/2 + (";
+            for (i = 0; i < concentrate_count; i++) {
+                RA_plus[index] += (length - concentrate_positions[i]) * P[i] / length;
+                ra_str += (length - concentrate_positions[i]).toFixed(fix) + "×" + P[i];
+                if (i < concentrate_count - 1) { ra_str += "+"; }
+            }
+            ra_str += ")/" + length + "=" + RA_plus[index].toFixed(fix);
+
+            RB_plus[index] = islt_q[q_index];       //计算RB-
+            RB_plus[index] += line_q[q_index] / cos_ar * (length - 2 * islt_length) / 2;
+            for (i = 0; i < concentrate_count; i++) {
+                RB_plus[index] += (concentrate_positions[i]) * P[i] / length;
+            }
+
+            //求解M
+            var Qz = new Array(concentrate_count + 2);
+            var Qy = new Array(concentrate_count + 2);
+
+            for (i = 0; i < concentrate_count + 2; i++) {
+                if (i == 0) {
+                    Qz[i] = RA_plus[index];             //首段，Qz=RZ-
+                } else {
+                    Qz[i] = Qy[i - 1] - P[i - 1];       //其后的Qz=Qy-P
+                }
+                Qy[i] = Qz[i] - tempqL[i];          //Qy=Qz-qL
+            }
+
+            var cols = concentrate_count + 1;       //显示计算表格的列数
+            for (i = 0; i < concentrate_count + 1; i++) {       
+                if (Qz[i]>0 &&  Qy[i] < 0) {        //如果需要考虑弯矩0点
+                    for (j = concentrate_count + 1; j > i + 1; j--) {
+                        tempL[j] = tempL[j - 1];        //插入一个显示列，从弯矩0点位置开始，之后的数据向后移一列，为弯矩0点腾空一列
+                        tempqL[j] = tempqL[j - 1];
+                        P[j] = P[j - 1];
+                        P[j - 1] = P[j - 2];
+                    }
+                    var ll = Qz[i] / line_q[q_index] * cos_ar;  //计算弯矩0点左侧导线长度
+                    var lr = tempL[i] - ll;                     //右侧导线长度=当前分段长度-左侧长度
+                    tempL[i] = ll;          //修改原有的分段长度，变为左侧长度
+                    tempL[i + 1] = lr;      //插入的分段长度，即右侧长度
+                    tempqL[i] = ll * line_q[q_index] / cos_ar;  //修正qL（左侧）
+                    tempqL[i + 1] = lr * line_q[q_index] / cos_ar;  //修正qL（右侧）
+                    P[i] = 0;           //新插入的弯矩0点无集中荷载
+                    cols++;     //标记插入一个列
+                    break;
+                }
+            }
+            //插入弯矩0点之后，刷新Qz和Qy
+            for (i = 0; i < cols; i++) {
+                if (i == 0) {
+                    Qz[i] = RA_plus[index];
+                } else {
+                    Qz[i] = Qy[i - 1] - P[i - 1];
+                }
+                Qy[i] = Qz[i] - tempqL[i];
+            }
+
+            //计算△M
+            var delta_M = new Array(cols);
+            M[index] = 0;
+            var tempM = 0;
+            for (i = 0; i < cols; i++) {
+                delta_M[i] = tempL[i] * (Qz[i] + Qy[i]) / 2;
+                if (delta_M[i] > 0) {
+                    M[index] += delta_M[i];
+                }
+                tempM += delta_M[i];        //累计全部△M
+            }
+
+            //求解荷载因数D
+            var temp_1 = new Array(cols);
+            var temp_2 = new Array(cols);
+            var delta_d = new Array(cols);
+            D[index] = 0;
+            for (i = 0; i < cols; i++) {
+                temp_1[i] = delta_M[i] * delta_M[i] / tempL[i];
+                temp_2[i] = tempqL[i] * tempqL[i] * tempL[i] / 12;
+                delta_d[i] = temp_1[i] + temp_2[i];
+                D[index] += delta_d[i];     //累计全部△D即为荷载因数D
+            }
+
+
+            //计算表格输出
+            var s = "<table cellspacing=0 cellpadding=0 style='margin: auto;margin-bottom:30px; border-collapse:collapse'>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' style='border:none;font-weight:bold' colspan=" + (cols + 2) + ">状态" + status_prex[index] + "(";
+            if (person_position[index] < 0) { s += status_str[index]; }
+            else { s += "导线上人：" + person_weight[index] + "kg，位于集中荷载" + (person_position[index] + 1) + "处，" + theta_m[index] + "℃"; }
+            if (status_str[index] == "施工安装") { s += "，" + theta_m[index] + "℃"; }
+            s += ") 时的M、D计算</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' colspan=2>支点反力</td>";
+            s += "<td class='input_cell_center' colspan=" + cols + ">" + ra_str + "</td>";
+            s += "</tr>";
+            //荷载图
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=3>荷载图</td>";
+            s += "<td class='input_cell_center' >△L(m)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + tempL[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >q△L(kgf)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + tempqL[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >P(kgf)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_right' >" + P[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //剪力图
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=2>剪力图</td>";
+            s += "<td class='input_cell_center' >Qz(kgf)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + Qz[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >Qy(kgf)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + Qy[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //delta_M
+            s += "<tr>";
+            s += "<td class='input_cell_center' colspan=2>△M=△L(Qz+Qy)/2(kgf·m)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + delta_M[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //ΣM
+            s += "<tr>";
+            s += "<td class='input_cell_center' colspan=2>M=Σ△M(kgf·m)</td>";
+            s += "<td class='input_cell_center' colspan=" + cols + " >M=" + M[index].toFixed(fix) + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;校验 Σ△M=" + tempM.toFixed(fix) + "</td > ";
+            s += "</tr>";
+
+            //荷载因数
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=4>荷载因数</td>";
+            s += "<td class='input_cell_center' >△M<sup>2</sup>/△L (kgf<sup>2</sup>·m)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + temp_1[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >(q△L)<sup>2</sup>△L/12 (kgf<sup>2</sup>·m)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + temp_2[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >△D(kgf<sup>2</sup>·m)</td>";
+            for (i = 0; i < cols; i++) {
+                s += "<td class='input_cell_center' >" + delta_d[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >D(kgf<sup>2</sup>·m)</td>";
+            s += "<td class='input_cell_center' colspan=" + cols + " >" + D[index].toFixed(fix) + " </td>";
+            s += "</tr>";
+
+
+            s += "</table>";
+            add_calc_state_table(s);        //输出至页面
+        }
+
+
+        //各状态计算表格输出至页面
+        function add_calc_state_table(str) {
+            var s = $("#output_calc_state").html();
+            s += str;
+            $("#output_calc_state").html(s);
+        }
+
+        //寻找最大弧垂的状态
+        function calc_output_calc_tm_H_f() {
+            for (i = 0; i < states_count; i++) {
+                Cm[i] = D[i] * 9.8 * 9.8 * epsi;        //初始化Cm，kgf转为N
+                M[i] = M[i] * 9.8;                      //初始化M，kgf转为N
+            }
+
+            var sources = [1, 0, 3];    //寻找最大弧垂状态的顺序：有冰有风、最高温度、最低温度
+            var fs = new Array(3);
+            var source;
+            for (k = 0; k < 3; k++) {   //每一个状态
+                source = sources[k];    //确定状态方程原始状态
+                init_calc_source(source);   //初始化原始状态参数
+                var bOK = true;
+                for (j = 0; j < single_status; j++) {   //计算各状态的弧垂
+                    if (j != source && j != 2) {        //如果不是原始状态，也不是最大风速状态，则：
+                        get_tal(source, j);         //计算该状态的弧垂
+                        if (f[j] > f[source]) {     //是否超过原始状态假定弧垂
+                            bOK = false;            //超出了
+                            break;
+                        }
+                    }
+                }
+                if (bOK) {      //如果已经找到，则以找到的状态为原始状态：
+                    for (j = 0; j < states_count; j++) {    //每种状态
+                        if (j != source) {  
+                            get_tal(source, j);     //计算其他各状态的弧垂
+                        }
+                    }
+                    write_output_calc_tm_H_f_01(source);    //输出表01
+                    write_output_calc_tm_H_f_02(source);    //输出表02
+                    break;
+                }
+            }
+            if (!bOK) { alert("No Solve"); }    //没找到最大弧垂状态
+            return bOK;
+        }
+
+
+
+        //初始化原始状态
+        function init_calc_source(source) {
+            f[source] = sag;                        //设定为允许弧垂
+            H[source] = M[source] / f[source];      //根据允许弧垂计算H
+            tal_m[source] = H[source] / line_s;     //计算σm
+        }
+
+        //根据原始状态和目标状态，计算弧垂
+        function get_tal(source, dest) {
+            Cn[dest] = Cm[source];
+            tal_n[dest] = tal_m[source];
+            delta_theta[dest] = theta_m[dest] - theta_n[dest];
+            B[dest] = ae * delta_theta[dest];
+            A[dest] = tal_n[dest] - Cn[dest] / tal_n[dest] / tal_n[dest] - B[dest];
+            tal_m[dest] = func_three(-A[dest], -Cm[dest]);          //求解三次方程
+            H[dest] = line_s * tal_m[dest];
+            f[dest] = M[dest] / H[dest];
+        }
+
+
+        //求解三次方程
+        //牛顿-拉夫逊法
+        function func_three(a2, a0) {
+            //求解x^3+ a2 x^2 + a0 =0
+            //对于手册中的σ^2(σ-A)=Cm
+            //去掉括号变为σ^3-Aσ^2-Cm=0
+            //因此，此处a2应该是-A，a0应该是-Cm
+            var e = 1E-6;
+            var x1 = 10;
+            var x2;
+            while (true) {
+                x2 = x1 - (Math.pow(x1, 3) + a2 * Math.pow(x1, 2) + a0) / (3 * Math.pow(x1, 2) + 2 * a2 * x1);
+                if (Math.abs(x2 - x1) < e) {
+                    return x2;
+                }
+                x1 = x2;
+            }
+        }
+
+        //输出H和f的计算结果表
+        function write_output_calc_tm_H_f_01(source_index) {
+
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+
+            s += "<tr>";
+            s += "<td colspan=" + (states_count + 2 - install_count) + " class='input_cell_center' style='font-weight:bold;border:none' >各种状态时的应力σm、拉力H和弧垂f值 表1</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td colspan=2 class='input_cell_center' >状态条件</td>";
+            for (i = 0; i < single_status; i++) {
+                s += "<td class='input_cell_center'>" + status_str[i];
+            }
+            for (i = single_status; i < single_status + concentrate_count * 2; i++) {
+                s += "<td class='input_cell_center' colspan=2>停电检修<br>" + person_weight[i] + "kg，位于集中荷载" + (person_position[i] + 1) + "处</td>"
+                i++;
+            }
+            for (i = single_status + concentrate_count * 2; i < single_status + concentrate_count * 4; i++) {
+                s += "<td class='input_cell_center' colspan=2>带电检修<br>" + person_weight[i] + "kg，位于集中荷载" + (person_position[i] + 1) + "处</td>"
+                i++;
+            }
+
+            //原始资料
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=3>原始资料</td>";
+            s += "<td class='input_cell_center'>M(N·m)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                if (i >= single_status) {
+                    s += "<td class='input_cell_center' colspan=2 >" + M[i].toFixed(fix) + "</td>";
+                    i++;
+                } else {
+                    s += "<td class='input_cell_center'>" + M[i].toFixed(fix) + "</td>";
+                }
+            }
+            s += "</tr><tr><td class='input_cell_center'>Cm=Dξ(N<sup>3</sup>/mm<sup>6</sup>)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                if (i >= single_status) {
+                    s += "<td class='input_cell_center' colspan=2>" + Cm[i].toFixed(fix) + "</td>";
+                    i++;
+                } else {
+                    s += "<td class='input_cell_center'>" + Cm[i].toFixed(fix) + "</td>";
+                }
+            }
+            s += "</tr><tr><td class='input_cell_center'>α·E(N/mm<sup>2</sup>·℃)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                if (i >= single_status) {
+                    s += "<td class='input_cell_center' colspan=2>" + ae.toFixed(fix) + "</td>";
+                    i++;
+                } else {
+                    s += "<td class='input_cell_center'>" + ae.toFixed(fix) + "</td>";
+                }
+            }
+            s += "</tr>";
+
+
+            //状态方程求解
+            s += "<tr><td class='input_cell_center' rowspan=8>状态方程求解</td>";
+            s += "<td class='input_cell_center'>Cn(N<sup>3</sup>/mm<sup>6</sup>)</td>";
+            var temp_s;
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = Cn[i].toFixed(fix);
+                if (i >= single_status) {
+                    s += "<td class='input_cell_center' colspan=2>" + temp_s + "</td>";
+                    i++;
+                } else {
+                    s += "<td class='input_cell_center'>" + temp_s + "</td>";
+                }
+            }
+            s += "</tr><tr><td class='input_cell_center'>σn(N/mm<sup>2</sup>)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = tal_n[i].toFixed(fix);
+                if (i >= single_status) {
+                    s += "<td class='input_cell_center' colspan=2>" + temp_s + "</td>";
+                    i++;
+                } else {
+                    s += "<td class='input_cell_center'>" + temp_s + "</td>";
+                }
+            }
+            s += "</tr><tr><td class='input_cell_center'>θn(℃)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = theta_n[i];
+                s += "<td class='input_cell_center'>" + temp_s + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>θm(℃)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                s += "<td class='input_cell_center'>" + theta_m[i] + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>△θ(℃)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = delta_theta[i];
+                s += "<td class='input_cell_center'>" + temp_s + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>B(N/mm<sup>2</sup>)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = B[i].toFixed(fix);
+                s += "<td class='input_cell_center'>" + temp_s + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>A(N/mm<sup>2</sup>)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                i == source_index ? temp_s = "" : temp_s = A[i].toFixed(fix);
+                s += "<td class='input_cell_center'>" + temp_s + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>σm(N/mm<sup>2</sup>)</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                s += "<td class='input_cell_center'>" + tal_m[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //输出H
+            s += "<tr><td class='input_cell_center' colspan=2>H</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                s += "<td class='input_cell_center'>" + H[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //输出f
+            s += "<tr><td class='input_cell_center' colspan=2>f</td>";
+            for (i = 0; i < states_count - install_count; i++) {
+                s += "<td class='input_cell_center'>" + f[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+
+
+
+            s += "</table>";
+            $("#output_calc_tm_H_f_01").html(s);
+        }
+        function write_output_calc_tm_H_f_02(source_index) {
+
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+
+            s += "<tr>";
+            s += "<td colspan=" + (install_count + 2) + " class='input_cell_center' style='font-weight:bold;border:none' >各种状态时的应力σm、拉力H和弧垂f值 表2</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td colspan=2 class='input_cell_center' >状态条件</td>";
+            s += "<td class='input_cell_center' colspan=" + install_count + ">施工安装</td></tr>";
+
+            //原始资料
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=3>原始资料</td>";
+            s += "<td class='input_cell_center'>M(N·m)</td><td class='input_cell_center' colspan=" + install_count + ">" + M[install_count].toFixed(fix) + "</td></tr>";
+            s += "<tr><td class='input_cell_center'>Cm=Dξ(N<sup>3</sup>/mm<sup>6</sup>)</td><td class='input_cell_center' colspan=" + install_count + ">" + Cm[install_count].toFixed(fix) + "</td></tr>";
+            s += "<tr><td class='input_cell_center'>α·E(N/mm<sup>2</sup>·℃)</td><td class='input_cell_center' colspan=" + install_count + ">" + ae.toFixed(fix) + "</td></tr>";
+
+
+            //状态方程求解
+            s += "<tr><td class='input_cell_center' rowspan=8>状态方程求解</td>";
+            s += "<td class='input_cell_center'>Cn(N<sup>3</sup>/mm<sup>6</sup>)</td><td class='input_cell_center' colspan=" + install_count + ">" + Cn[install_count].toFixed(fix) + "</td></tr>";
+            s += "<tr><td class='input_cell_center'>σn(N/mm<sup>2</sup>)</td><td class='input_cell_center' colspan=" + install_count + ">" + tal_n[install_count].toFixed(fix) + "</td></tr>";
+            s += "<tr><td class='input_cell_center'>θn(℃)</td><td class='input_cell_center' colspan=" + install_count + ">" + theta_n[install_count] + "</td></tr>";
+            s += "<tr><td class='input_cell_center'>θm(℃)</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + theta_m[i] + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>△θ(℃)</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + delta_theta[i] + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>B(N/mm<sup>2</sup>)</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + B[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>A(N/mm<sup>2</sup>)</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + A[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr><tr><td class='input_cell_center'>σm(N/mm<sup>2</sup>)</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + tal_m[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //H
+            s += "<tr><td class='input_cell_center' colspan=2>H</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + H[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+            //f
+            s += "<tr><td class='input_cell_center' colspan=2>f</td>";
+            for (i = states_count - install_count; i < states_count; i++) {
+                s += "<td class='input_cell_center'>" + f[i].toFixed(fix) + "</td>";
+            }
+            s += "</tr>";
+
+
+
+            s += "</table>";
+            //t = $("#output_calc_tm_H_f").html();
+            $("#output_calc_tm_H_f_02").html(s);
+        }
+
+        //输出：计算结果
+        function write_output_calc_result() {
+            var d = new Date();
+            d = d.toLocaleDateString();
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+            s += "<tr><td colspan=6 class='input_cell_center' style='font-weight:bold;border:none' >配电装置导线拉力计算输出结果</td></tr>";
+            s += "<tr>";
+            s += "<td colspan=4 class='input_cell_left' style='border:none' >项目名称：" + $("#project").val() + "</td>";
+            s += "<td colspan=2 class='input_cell_right' style='border:none' >" + d + "</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td colspan=4 class='input_cell_left' style='border:none' >架构名称：" + $("#frame").val() + "</td>";
+            s += "<td colspan=2 class='input_cell_right' style='border:none' >电压等级：" + voltage + "(kV)</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' rowspan=2>计算状态</td>";
+            s += "<td class='input_cell_center' rowspan=2>环境温度<br/>[℃]</td>";
+            s += "<td class='input_cell_center' rowspan=2>水平拉力<br/>[kg]</td>";
+            s += "<td class='input_cell_center' rowspan=2>导线弧垂<br/>[m]</td>";
+            s += "<td class='input_cell_center' colspan=2>支座反力[kg]</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center' >RA</td>";
+            s += "<td class='input_cell_center' >RB</td>";
+            s += "</tr>";
+
+            var line_title = true;
+
+            for (i = 0; i < single_status + concentrate_count * 4; i++) {
+
+                RA[i] = RA_plus[i] + H[i] * Math.tan(ar);       //计算RA
+                RB[i] = RB_plus[i] - H[i] * Math.tan(ar);       //计算RB
+                s += "<tr>";
+                if (i < single_status) {
+                    s += "<td class='input_cell_center'>" + status_str[i] + "</td>";
+                } else if (i < concentrate_count * 2) {
+                    if (line_title) { s += "<td class='input_cell_center' rowspan=2 >停电检修<br>（" + person_weight[i] + "kg，位于集中荷载" + (person_position[i] + 1) + "处）</td>"; }
+                    line_title = !line_title;
+                } else {  
+                    if (line_title) { s += "<td class='input_cell_center' rowspan=2 >带电检修<br>（" + person_weight[i] + "kg，位于集中荷载" + (person_position[i] + 1) + "处）</td>"; }
+                    line_title = !line_title;
+                }
+
+                s += "<td class='input_cell_center'>" + theta_m[i] + "</td>";
+                s += "<td class='input_cell_center'>" + (H[i] / 9.8).toFixed(fix) + "</td>";        //折算为kgf
+                s += "<td class='input_cell_center'>" + f[i].toFixed(fix) + "</td>";
+                s += "<td class='input_cell_center'>" + RA[i].toFixed(fix) + "</td>";
+                s += "<td class='input_cell_center'>" + RB[i].toFixed(fix) + "</td>";
+                s += "</tr>";
+            }
+
+            s += "</table>";
+            $("#output_calc_result").html(s);
+        }
+
+        //输出：安装数据
+        function write_output_install_data() {
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+            s += "<tr><td colspan=5 class='input_cell_center' style='font-weight:bold;border:none' >施工安装曲线数据</td></tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_center'>环境温度[℃]</td>";
+            s += "<td class='input_cell_center'>水平拉力[kg]</td>";
+            s += "<td class='input_cell_center'>水平拉力[N]</td>";
+            s += "<td class='input_cell_center'>导线弧垂[m]</td>";
+            s += "<td class='input_cell_center'>导线长度[m]</td>";
+            s += "</tr>";
+            for (i = single_status + concentrate_count * 4; i < states_count; i++) {
+                //计算导线长度
+                //公式根据手册FORTRAN程序推导而来
+                line_length[i] = ((cos_ar * cos_ar * D[i]) / (2 * (H[i] / 9.8) * (H[i] / 9.8)) + (length - 2 * islt_length * cos_ar)) / cos_ar;
+                s += "<tr>";
+                s += "<td class='input_cell_center'>" + theta_m[i] + "</td>";
+                s += "<td class='input_cell_center'>" + (H[i] / 9.8).toFixed(fix) + "</td>";
+                s += "<td class='input_cell_center'>" + H[i].toFixed(fix) + "</td>";
+                s += "<td class='input_cell_center'>" + f[i].toFixed(fix) + "</td>";
+                s += "<td class='input_cell_center'>" + line_length[i].toFixed(fix) + "</td>";
+                s += "</tr>";
+            }
+            s += "</table>";
+            $("#output_install_data").html(s);
+
+        }
+
+        //绘制：安装图
+        function draw_output_install_figure() {
+
+            var s = "";
+            var h_Seprate = 40;         //横向间隔40
+            var w_Seprate = 25;         //纵向间隔25
+            var frame_width = 70;       //留边70
+            var w_offset = 2;           //横坐标（安装温度）左右留空白格
+            var w = (install_count + 2 * w_offset - 1) * w_Seprate;     //画布宽
+            var h = 600;                //画布高
+            s += "<canvas id='install_figure_canvas' width='" + (w + 2 * frame_width) + "' height='" + (h + 2 * frame_width) + "' style='margin:auto'>  </canvas>";
+            $("#output_install_figure").html(s);        //插入画布
+            var c = document.getElementById("install_figure_canvas");       //获取画布对象
+            do_draw_output_install_figure(c);       //绘图
+        }
+
+
+        //绘制安装图
+        //输入参数：画布对象
+        function do_draw_output_install_figure(c) {
+            var ctx = c.getContext("2d");
+
+            var h_Seprate = 40;
+            var w_Seprate = 25;
+            var frame_width = 70;
+            var w_offset = 2;
+            var w = (install_count + 2 * w_offset - 1) * w_Seprate;
+            var h = 600;
+
+            ctx.fillStyle = "#eeeeee";
+            ctx.fillRect(0, 0, w + 2 * frame_width, h + 2 * frame_width);       //背景涂灰
+            ctx.fillStyle = "#000000";
+            ctx.strokeStyle = "#000000";
+            ctx.font = "12px Arial";
+            //画横坐标（即：纵向网格线）
+            ctx.beginPath();
+            var index;
+            for (x = 0; x < install_count + 2 * w_offset; x++) {
+                ctx.moveTo(x * w_Seprate + frame_width, frame_width);
+                ctx.lineTo(x * w_Seprate + frame_width, h + frame_width);
+            }
+            for (x = 0; x < install_count; x++) {
+                index = x + single_status + concentrate_count * 4;
+                ctx.textAlign = "center";
+                ctx.fillText(theta_m[index], (install_count - x + w_offset - 1) * w_Seprate + frame_width, h + frame_width + 15);   //标记横坐标文字
+            }
+            ctx.stroke();
+            //画纵坐标（即：横向网格线），左侧为f，右侧为H
+
+            ctx.textAlign = "right";        //左侧纵坐标文字靠右对齐
+            var lines_count = (h / h_Seprate) / 2 + 1;  //一半的横线总数量，即横坐标刻度线数/2+1
+            value_F = getMinMax(f, lines_count);        //获取起始值和间隔值
+            value_H = getMinMax(H, lines_count);            
+            DrawAxis(ctx, w, h, frame_width, h_Seprate, value_F[0], value_F[1], frame_width - 10, "f(m)");  //画f坐标轴
+            ctx.textAlign = "left";         //右侧纵坐标文字靠左对齐
+            DrawAxis(ctx, w, h, frame_width, h_Seprate, value_H[0], value_H[1], w + frame_width + 20, "H(N)");  //画H坐标轴
+            DrawValue(ctx, h, value_F[0], value_F[1], w_Seprate, h_Seprate, w_offset, frame_width, f, "f(m)");  //画f曲线
+            DrawValue(ctx, h, value_H[0], value_H[1], w_Seprate, h_Seprate, w_offset, frame_width, H, "H(N)");  //画H曲线
+        }
+
+        //获取起始值和间隔值
+        //输入参数：arg：值数组，lines_count：一半的横线总数量
+        //输出：最小值（即刻度起始值），刻度间隔
+        function getMinMax(arg, lines_count) {
+            var start = single_status + concentrate_count * 4;  //每种安装状态
+            var Max = -1;       //最大值初始值
+            var Min = 1E10;     //最小值初始值
+            for (i = start; i < states_count; i++) {
+                if (Max < arg[i]) { Max = arg[i]; }     //检测最大值
+                if (Min > arg[i]) { Min = arg[i]; }     //检测最小值
+            }
+            var dis = (Max - Min).toExponential();      //差值，采用科学计数法表示
+            var pos = dis.indexOf("e");                 //科学计数法的指数位
+            var f_pow_e = - (dis.substr(pos + 1) * 1) + 1;  //科学计数法的乘方数
+            var f_pow = Math.pow(10, f_pow_e);          //乘方因子
+            Min = parseInt((Min - (Max - Min) * .1) * f_pow) / f_pow;       //最小值取整
+            Max = parseInt((Max + (Max - Min) * .1) * f_pow) / f_pow;       //最大值取整
+            var Mid = Min + (Max - Min) / 2;            //最小最大的中间值
+            var sep = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50];     //刻度间隔备选，由小到大进行测试
+            for (var i = 0; i < lines_count; i++) {
+                temp_min = Mid - sep[i] * Math.pow(10, -f_pow_e) * (lines_count - 1);   //如果中间值-刻度线*刻度间隔
+                if (temp_min < Min) {                                                   //小于最小值，即：刻度值能够覆盖住最小值，则，符合要求
+                    break;
+                }
+            }
+            Min = Mid - sep[i] * Math.pow(10, -f_pow_e) * (lines_count - 1);        //根据选定的刻度值，刷新最小值
+            Max = Max + sep[i] * Math.pow(10, -f_pow_e) * (lines_count - 1);        //可以不用在此处刷新最大值
+            Min = parseInt(Min * f_pow);        //最小值扩大为整数
+            while (Min % 5 != 0) { Min--; }     //末尾取0或5
+            Min /= f_pow;       //再取回小数 
+            return [Min, sep[i] * Math.pow(10, -f_pow_e)];      //返回值：最小值，刻度间隔
+        }
+
+        //绘制坐标轴
+        //输入参数：画布对象，画布宽、高、边距、刻度线间距，刻度最小值，刻度间隔，标注文字位置，坐标轴名称
+        function DrawAxis(ctx, w, h, frame_w, sep, min, step, text_pos, Axis_name) {
+            ctx.beginPath();
+            for (y = frame_w; y < h + frame_w + 1; y = y + sep) {
+                ctx.moveTo(frame_w, y);
+                ctx.lineTo(w + frame_w, y);     //画横线
+                ctx.fillText((min + step * (y - frame_w) / sep).toFixed(fix), text_pos, h + 2 * frame_w - y);   //标注刻度
+            }
+            ctx.fillText(Axis_name, text_pos, frame_w * .5);        //标注坐标轴名称
+            ctx.stroke();
+        }
+
+        //绘制数值曲线
+        //输入参数：画布对象，画布宽、刻度最小值，刻度间隔，横向线间距，纵向线间距，横向空白坐标，留白，值数组，值名称
+        function DrawValue(ctx, h, min, step, w_sep, h_sep, w_off, frame_w, value, valueName) {
+            var start = single_status + concentrate_count * 4;  //安装状态
+            ctx.beginPath();
+            for (x = 0; x < install_count; x++) {       //每一个数值点，从0开始
+                index = x + single_status + concentrate_count * 4;              //计算对应的值数组序号
+                x_point = (install_count - x + w_off - 1) * w_sep + frame_w;    //折算x坐标（温度），数值和坐标顺序是反的
+                y_point = h - (value[index] - min) / step * h_sep + frame_w;    //折算y坐标（f或者H）
+                if (x == 0) { ctx.moveTo(x_point, y_point); }       //第一个点，不划线，只移动笔
+                else { ctx.lineTo(x_point, y_point); }              //后续，划线
+            }
+            ctx.stroke();
+            ctx.font = "20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#0000ff";
+
+            ctx.fillText(valueName, x_point, y_point - 15);     //标注值名称
+
+        }
+
+
+        //检测输出用临时表。
+        function check() {
+            //检测
+            var s = "";
+            s += "<table cellspacing=0 cellpadding=0 style='margin: auto; border-collapse:collapse'>";
+
+            s += "<tr>";
+            s += "<td class='input_cell_center' >i</td>";
+            s += "<td class='input_cell_center' >status_prex[i]</td>";
+            s += "<td class='input_cell_center' >status_str[i]</td>";
+            //s += "<td class='input_cell_center' >q[i]</td>";
+            //s += "<td class='input_cell_center' >Q[i]</td>";
+            //s += "<td class='input_cell_center' colspan=" + concentrate_count + " >P[i]</td>";
+            s += "<td class='input_cell_center' >person_weight[i]</td>";
+            s += "<td class='input_cell_center' >person_position[i]</td>";
+            s += "<td class='input_cell_center' >theta_n[i]</td>";
+            s += "<td class='input_cell_center' >theta_m[i]</td>";
+            s += "</tr>";
+
+            for (i = 0; i < states_count; i++) {
+                s += "<tr>";
+                s += "<td class='input_cell_center'>" + i + "</td>";
+                s += "<td class='input_cell_center'>" + status_prex[i] + "</td>";
+                s += "<td class='input_cell_center'>" + status_str[i] + "</td>";
+                //s += "<td class='input_cell_center'>" + status_str[i] + "</td>";
+                //s += "<td class='input_cell_center'>" + status_str[i] + "</td>";
+                s += "<td class='input_cell_center'>" + person_weight[i] + "</td>";
+                s += "<td class='input_cell_center'>" + person_position[i] + "</td>";
+                s += "<td class='input_cell_center'>" + theta_n[i] + "</td>";
+                s += "<td class='input_cell_center'>" + theta_m[i] + "</td>";
+                s += "</tr>";
+            }
+            s += "</table>";
+            $("#output_test").html(s);
+
+        }
+
+        //生成计算报告
+        function gen_report() {
+            var d = new Date();
+            d = d.toLocaleDateString();
+
+
+            var report_window = window.open("about:blank");     //打开新页面
+            //拷贝现有计算结果
+            var s = "<!DOCTYPE html><html lang='en' xmlns='http://www.w3.org/1999/xhtml'><head><meta charset='utf-8'/><title>导线拉力计算报告</title>";
+
+            //样式表
+            s += "<style>.input_title{border:none;font-size:24px;font-family:微软雅黑;text-align:center;margin:auto}\n";
+            s += ".input_item_title{border:1px solid black;font-size:14px;font-family:微软雅黑;font-weight:bold;text-align:center;padding:5px;}\n";
+            s += ".input_cell_right{border:1px solid black;font-size:14px;font-family:微软雅黑;text-align:right;padding:5px;}\n";
+            s += ".input_cell_center{border:1px solid black;font-size:14px;font-family:微软雅黑;text-align:center;padding:5px;;margin:auto}\n";
+            s += ".input_cell_left{border:1px solid black;font-size:14px;font-family:微软雅黑;text-align:left;padding:5px;}\n";
+            s += ".input_box{font-size:14px;font-family:微软雅黑;text-align:right;width:100%;border:none;}\n";
+            s += ".input_box_fill{font-size:14px;font-family:微软雅黑;text-align:right;width:100%;border:none;}\n";
+            s += ".black_border{border:1px solid black;text-align:center;}\n";
+            s += ".btn{font-size:14px;font-family:微软雅黑;}\n";
+            s += ".color_title{background-color:#ccffbb;}\n";
+            s += ".color_proj{background-color:#ffe699;}\n";
+            s += ".color_calc_title{background-color:#444444;color:white;}\n";
+            s += ".color_weather{background-color:#cceebb;}\n";
+            s += ".color_line{background-color:#bbddee;}\n";
+            s += ".color_islt{background-color:#ffccff;}\n";
+            s += ".color_concentrate{background-color:#ffbbbb;}\n";
+            s += ".out_put_div{margin:30px;}\n";
+            s += "    </style>";
+
+            s += "</head ><body style='text-align:center'>";
+            s += "<div class='input_title' style='width:600px;margin:auto' >导线拉力计算报告</div>";
+            s += "<div class='input_cell_center' style='width:600px;;margin:auto;border:none' >";
+            s += "<table cellspacing=0 cellpadding=0 style='margin:auto;border-collapse:collapse;border:none'>";
+            s += "<tr>";
+            s += "<td class='input_cell_left' style='border:none;width:400px;' >项目名称：" + $("#project").val() + "</td>";
+            s += "<td class='input_cell_right' style='border:none;width:200px;' >" + d + "</td>";
+            s += "</tr>";
+            s += "<tr>";
+            s += "<td class='input_cell_left' style='border:none' >架构名称：" + $("#frame").val() + "</td>";
+            s += "<td class='input_cell_right' style='border:none' >电压等级：" + voltage + "(kV)</td>";
+            s += "</tr></table></div>";
+            s += "<div class='input_cell_center' style='border:none' id='report'></div>";
+            s += "</body ></html> ";
+            report_window.document.write(s);
+
+            var r = document.getElementById("div_output").innerHTML;
+            report_window.document.getElementById("report").innerHTML = r;  //拷贝现有计算表输出的内容
+
+            //重新绘图
+            var c = report_window.document.getElementById("output_figure_canvas");
+            do_draw_figure(c);      //架构图
+
+            var h_Seprate = 40;
+            var w_Seprate = 25;
+            var frame_width = 70;
+            var w_offset = 2;
+            var w = (install_count + 2 * w_offset - 1) * w_Seprate;
+            var h = 600;
+            c = report_window.document.getElementById("install_figure_canvas");
+            do_draw_output_install_figure(c);       //安装曲线图
+        }
+    </script>
+</head>
+<body>
+    <div id="input_table" style="text-align:center">
+        <table cellspacing=0 cellpadding=0 style="margin:auto;border-collapse:collapse">
+            <colgroup>
+                <col id="01" style="width:80px;" />
+                <col id="01" style="width:80px;" />
+                <col id="02" style="width:140px;" />
+                <col id="03" style="width:140px;" />
+                <col id="04" style="width:140px;" />
+                <col id="05" style="width:140px;" />
+                <col id="06" style="width:180px;" />
+                <col id="07" style="width:100px;" />
+                <col id="08" style="width:100px;" />
+                <col id="09" style="width:100px;" />
+                <col id="10" style="width:100px;" />
+            </colgroup>
+            <tr><td colspan=11 class="input_title color_title">导线拉力计算程序<br />原始数据输入</td></tr>
+            <tr>
+                <td colspan=3 class="input_item_title color_proj">项目信息</td>
+                <td class="input_cell_right color_proj">项目名称</td>
+                <td class="input_cell_center color_proj" colspan="3"><input alt="项目名称" type="text" id="project" class="input_box" /></td>
+                <td class="input_cell_right color_proj">架构名称</td>
+                <td class="input_cell_center color_proj" colspan="3"><input alt="架构名称" type="text" id="frame" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td colspan=3 class="input_item_title color_proj">架构信息</td>
+                <td class="input_cell_right color_proj">电压等级(kV)</td>
+                <td class="input_cell_center color_proj"><input alt="电压等级" type="text" id="voltage" class="input_box" /></td>
+                <td class="input_cell_right color_proj">跨距(m)</td>
+                <td class="input_cell_center color_proj"><input alt="跨距" type="text" id="length" class="input_box" /></td>
+                <td class="input_cell_right color_proj">高差(m)</td>
+                <td class="input_cell_center color_proj"><input alt="高差" type="text" id="dispersion" class="input_box" /></td>
+                <td class="input_cell_right color_proj">允许弧垂(m)</td>
+                <td class="input_cell_center color_proj"><input alt="允许弧垂" type="text" id="sag" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td colspan=6 class="input_item_title color_calc_title"></td>
+                <td class="input_item_title color_calc_title">计算状态</td>
+                <td class="input_cell_center color_calc_title">无冰无风<br>(q1)</td>
+                <td class="input_cell_center color_calc_title">有冰有风<br>(q7)</td>
+                <td class="input_cell_center color_calc_title">最大风速<br>(q6)</td>
+                <td class="input_cell_center color_calc_title">安装<br />(q6')</td>
+            </tr>
+            <tr>
+                <td rowspan=3 class="input_item_title color_weather">气象<br />数据</td>
+                <td colspan="2" rowspan=3 class="input_cell_right color_weather">气象区</td>
+                <td colspan=3 rowspan=1 class="input_cell_center color_weather" style="border-bottom:none ">
+                    <p>
+                        <select id="weather_zones" class="input_box" style="text-align:right" onchange="fill_weather_data_to_weather_table()">
+                        </select>
+                    </p>
+                </td>
+                <td class="input_cell_right color_weather">温度(°C)</td>
+                <td class="input_cell_center color_weather">
+                    <input alt="无冰无风状态最低温度" type="text" id="weather_q0_t0" class="input_box" style='width:40%' />/
+                    <input alt="无冰无风状态最高温度" type="text" id="weather_q0_t1" class="input_box" style='width:40%' />
+                </td>
+                <td class="input_cell_center color_weather"><input alt="有冰有风状态温度" type="text" id="weather_q1_t" class="input_box" onchange="weather_typed('weather_q1_t')" /></td>
+                <td class="input_cell_center color_weather"><input alt="最大风速状态温度" type="text" id="weather_q2_t" class="input_box" onchange="weather_typed('weather_q2_t')" /></td>
+                <td class="input_cell_center color_weather"><input alt="安装状态温度" type="text" id="weather_q3_t" class="input_box" onchange="weather_typed('weather_q3_t')" /></td>
+            </tr>
+            <tr>
+                <td class="input_cell_left color_weather" rowspan="2" colspan=3 id="weather_discription" style="width:400px;"></td>
+                <td class="input_cell_right color_weather">最大风速(m/s)</td>
+                <td class="input_cell_center color_weather"><input alt="无冰无风状态最大风速" type="text" id="weather_q0_v" class="input_box" /></td>
+                <td class="input_cell_center color_weather"><input alt="有冰有风状态最大风速" type="text" id="weather_q1_v" class="input_box" onchange="weather_typed('weather_q1_v')" /></td>
+                <td class="input_cell_center color_weather"><input alt="最大风速状态最大风速" type="text" id="weather_q2_v" class="input_box" onchange="weather_typed('weather_q2_v')" /></td>
+                <td class="input_cell_center color_weather"><input alt="安装状态最大风速" type="text" id="weather_q3_v" class="input_box" onchange="weather_typed('weather_q3_v')" /></td>
+            </tr>
+            <tr>
+                <td class="input_cell_right color_weather">覆冰厚度(mm)</td>
+                <td class="input_cell_center color_weather"><input alt="无冰无风状态覆冰厚度" type="text" id="weather_q0_b" class="input_box" /></td>
+                <td class="input_cell_center color_weather"><input alt="有冰有风状态覆冰厚度" type="text" id="weather_q1_b" class="input_box" onchange="weather_typed('weather_q1_b')" /></td>
+                <td class="input_cell_center color_weather"><input alt="最大风速状态覆冰厚度" type="text" id="weather_q2_b" class="input_box" onchange="weather_typed('weather_q2_b')" /></td>
+                <td class="input_cell_center color_weather"><input alt="安装状态覆冰厚度" type="text" id="weather_q3_b" class="input_box" onchange="weather_typed('weather_q3_b')" /></td>
+            </tr>
+            <tr>
+                <td rowspan=3 class="input_item_title color_line">导线<br />数据</td>
+                <td colspan="2" class="input_cell_right color_line">导线选型</td>
+                <td class="input_cell_center color_line" colspan=3>
+                    <select id="line_list" class="input_box" style="text-align:right" onchange="fill_line_data_to_line_table()">
+                    </select>
+                </td>
+                <td class="input_cell_center color_line" rowspan=3>
+                    导线荷重(kgf/m)<br />
+                    <input type="checkbox" checked="checked" id="chk_use_table_line_q0" onclick="calc_line_weight_data('line_q0')" />优先使用数据表数据
+                </td>
+                <td class="input_cell_center color_line" rowspan=3><input alt="无冰无风状态导线荷重" type="text" id="line_q0" class="input_box" onchange="q0_typed('line_q0')" /></td>
+                <td class="input_cell_center color_line" rowspan=3><input alt="有冰有风状态导线荷重" type="text" id="line_q1" class="input_box" /></td>
+                <td class="input_cell_center color_line" rowspan=3><input alt="最大风速状态导线荷重" type="text" id="line_q2" class="input_box" /></td>
+                <td class="input_cell_center color_line" rowspan=3><input alt="安装状态导线荷重" type="text" id="line_q3" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td colspan="2" class="input_cell_right color_line">导线外径(mm)</td>
+                <td class="input_cell_center color_line"><input alt="导线外径" type="text" id="line_d" class="input_box" /></td>
+                <td class="input_cell_right color_line">导线截面(mm<sup>2</sup>)</td>
+                <td class="input_cell_center color_line"><input alt="导线截面" type="text" id="line_s" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td colspan="2" class="input_cell_right color_line">膨胀系数(1/°C)</td>
+                <td class="input_cell_center color_line"><input alt="膨胀系数" type="text" id="line_a" class="input_box" /></td>
+                <td class="input_cell_right color_line">弹性模量(N/mm<sup>2</sup>)</td>
+                <td class="input_cell_center color_line"><input alt="弹性模量" type="text" id="line_e" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td rowspan=2 class="input_item_title color_islt">绝缘子串<br />数据</td>
+                <td colspan="2" class="input_cell_right color_islt">绝缘子串选型</td>
+                <td class="input_cell_center color_islt" colspan=2>
+                    <select id="islt_list" class="input_box" style="text-align:right" onchange="fill_islt_data_to_islt_table()"></select>
+                </td>
+                <td class="input_cell_center color_islt" id="islt_str">XP7</td>
+
+                <td class="input_cell_center color_islt" rowspan=2>
+                    绝缘子荷重(kgf/m)<br />
+                    <input type="checkbox" checked="checked" id="chk_use_table_islt" onclick="calc_islt_weight_data()" />优先使用数据表数据<br />
+                </td>
+                <td class="input_cell_center color_islt" rowspan=2><input alt="无冰无风状态绝缘子荷重" type="text" id="islt_q0" class="input_box" onchange="islt_q0_typed()" /></td>
+                <td class="input_cell_center color_islt" rowspan=2><input alt="有冰有风状态绝缘子荷重" type="text" id="islt_q1" class="input_box" /></td>
+                <td class="input_cell_center color_islt" rowspan=2><input alt="最大风速状态绝缘子荷重" type="text" id="islt_q2" class="input_box" /></td>
+                <td class="input_cell_center color_islt" rowspan=2><input alt="安装状态绝缘子荷重" type="text" id="islt_q3" class="input_box" /></td>
+            </tr>
+            <tr>
+                <td colspan="2" class="input_cell_right color_islt">片数调整</td>
+                <td class="input_cell_center color_islt" id="td_islt_count"></td>
+                <td class="input_cell_right color_islt">绝缘子串长度(mm)</td>
+                <td class="input_cell_center color_islt"><input alt="绝缘子串长度" type="text" id="islt_length" class="input_box" /></td>
+            </tr>
+        </table>
+    </div>
+    <p style="text-align:center">
+        <button class="btn" onclick="add_concentrate_at_islt(concentrate_count)">自动补充绝缘子端部引下线</button>&nbsp;&nbsp;&nbsp;&nbsp;
+        <button class="btn" onclick="add_concentrate_table(concentrate_count)">增加集中荷载</button>&nbsp;&nbsp;&nbsp;&nbsp;
+        <button class="btn" onclick="del_all_concentrate(concentrate_count)">删除所有集中荷载</button>&nbsp;&nbsp;&nbsp;&nbsp;
+    </p>
+
+    <div id="concentrate_div" style="text-align:center">
+    </div>
+
+    <div style="text-align:center;margin:30px;">
+        <input type="button" class="btn" id="btn" value="开始计算" onclick="go()" />
+    </div>
+    <div style="text-align:center;margin:30px;" id="gen_report">
+        <input type="button" class="btn" id="btn" value="生成计算书" onclick="gen_report()" />
+    </div>
+
+    <div id="div_output">
+        <div class="out_put_div" id="output_figure" style="text-align:center"></div>
+        <div class="out_put_div" id="output_input_data"></div>
+        <div class="out_put_div" id="output_concentrate_data"></div>
+        <div class="out_put_div" id="output_calc_state"></div>
+        <div class="out_put_div" id="output_calc_tm_H_f_01"></div>
+        <div class="out_put_div" id="output_calc_tm_H_f_02"></div>
+        <div class="out_put_div" id="output_calc_result"></div>
+        <div class="out_put_div" id="output_install_data"></div>
+        <div class="out_put_div" id="output_install_figure" style="text-align:center"></div>
+    </div>
+    <script type="text/javascript">
+
+        $("input").each(function () {
+            if ($(this).attr("type") == "text") {
+                var id = $(this).attr("id");
+                $(this).val(id);
+            }
+        });
+        $("#project").val("测试项目");
+        $("#frame").val("测试架构");
+        $("#voltage").val("110");
+        $("#sag").val(2.0);
+        $("#length").val(30);
+        $("#dispersion").val(10);
+
+        ///正式初始化
+        init_arrrays();
+        load_weather_zones();
+        fill_weather_data_to_weather_table();
+        load_line_info("line_list");
+        fill_line_data_to_line_table();
+        load_islt_info();
+        fill_islt_data_to_islt_table();
+
+        $("#gen_report").hide();
+    </script>
+    <div id="output_test"></div>
+
+</body>
+</html>
